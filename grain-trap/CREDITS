@@ -1,0 +1,23 @@
+«Зерновая ловушка» — third-party material in the film
+
+Picture
+- Whiteboard engine (js/wb.js) and marker/eraser/magnet foley recipes (mix.py): adapted from the Lemo-Opuscar
+  library, styles/whiteboard/demo — https://github.com/lemomo-ai/lemo-opuscar — MIT License.
+- Board lettering: Hershey Fonts, Cyrillic set (cyrillic.jhf), converted to single-line JSON (fonts/hershey-cyr.json)
+  from https://github.com/kamalmostafa/hershey-fonts.
+  The Hershey Fonts were originally created by Dr. A. V. Hershey while working at the U. S. National Bureau of Standards.
+  The format of the Font data in this distribution was originally created by James Hurt, Cognition, Inc.,
+  900 Technology Park Drive, Billerica, MA 01821. Full notice: fonts/HERSHEY-LICENSE.txt.
+- Subtitles: Caveat (Impallari Type), SIL Open Font License 1.1 — https://github.com/google/fonts/tree/main/ofl/caveat
+  (fonts/OFL-Caveat.txt).
+
+Sound
+- Narration: synthetic voice, Piper TTS (https://github.com/rhasspy/piper, piper-tts on PyPI) with the voice model
+  "ru irinia medium" (release v0.0.2). Model card: dataset from RHVoice (https://github.com/RHVoice/RHVoice),
+  licence GPLv2. Check that this licence suits your use before publishing; replacing the narration with your own
+  recording or another licensed voice is a one-file change (voice/<id>.wav, same ids as lines.json).
+- Score and all sound effects: synthesised in code for this film (music.py, mix.py). No samples.
+
+Software
+- Lemo-Opuscar core tools (rendering, mux, srt, sfx helpers), MIT.
+- ffmpeg (imageio-ffmpeg build, LGPL/GPL), Playwright Chromium headless shell.
