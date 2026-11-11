@@ -1,0 +1,7 @@
+«7 правил выживания в зомби-апокалипсисе» — third-party material
+
+- Narration: supplied by the channel owner (generated in Google AI Studio, Gemini TTS) — vo-src/gemini.wav.
+- Style and techniques: Lemo-Opuscar library, styles/halftone-dossier — https://github.com/lemomo-ai/lemo-opuscar — MIT.
+  Engine helpers (per-character text, halftone, stamp, caption bar, paper/grain, boil filter) re-implemented for a vertical frame in index.html.
+- Fonts (SIL Open Font License 1.1, files in fonts/ with their OFL texts): Playfair Display, Rubik, JetBrains Mono, Bagel Fat One, Caveat — from https://github.com/google/fonts.
+- Characters, props, music and sound effects: drawn and synthesised in code for this film (index.html, mix.py). No samples.

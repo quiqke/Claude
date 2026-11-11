@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>7 правил выживания</title>
+<!-- Halftone Dossier, vertical 1080×1920 @ 30 fps. Engine ideas from the Lemo-Opuscar halftone-dossier demo (MIT); everything re-built for this film. -->
+<style>
+@font-face { font-family: 'Playfair'; src: url(fonts/PlayfairDisplay.ttf); font-weight: 400 900; font-display: block; }
+@font-face { font-family: 'Rubik'; src: url(fonts/Rubik.ttf); font-weight: 300 900; font-display: block; }
+@font-face { font-family: 'JBMono'; src: url(fonts/JetBrainsMono.ttf); font-weight: 100 800; font-display: block; }
+@font-face { font-family: 'Bagel'; src: url(fonts/BagelFatOne.ttf); font-weight: 400; font-display: block; }
+@font-face { font-family: 'Caveat'; src: url(fonts/Caveat.ttf); font-weight: 400 700; font-display: block; }
+html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #F2EAD8; }
+svg, canvas { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+#paper { mix-blend-mode: multiply; pointer-events: none; }
+.mul { mix-blend-mode: multiply; }
+</style>
+</head>
+<body>
+<svg id="stage" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="boil" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence id="boilT" type="fractalNoise" baseFrequency="0.022" numOctaves="2" seed="1" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="5" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="2" seed="4" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -22 15.2" result="gm"/>
+      <feComposite in="d" in2="gm" operator="in"/>
+    </filter>
+    <filter id="stampInk" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" seed="11" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="7" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="3" seed="21" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -9 5.9" result="gm"/>
+      <feComposite in="d" in2="gm" operator="in"/>
+    </filter>
+    <clipPath id="frameClip"><rect width="1080" height="1920"/></clipPath>
+  </defs>
+  <g clip-path="url(#frameClip)">
+    <g id="cam"><g id="world"></g></g>
+    <g id="hud"></g>
+    <g id="caps"></g>
+    <g id="wipe"></g>
+    <rect id="flash" width="1080" height="1920" fill="#FFFFFF" opacity="0"/>
+  </g>
+</svg>
+<canvas id="paper" width="1080" height="1920"></canvas>
+<canvas id="fx" width="1080" height="1920"></canvas>
+<script>
+// ───────────────────────────── basics
+const NS = 'http://www.w3.org/2000/svg', W = 1080, H = 1920, FPS = 30;
+const C = { paper: '#F2EAD8', ink: '#1C2A23', shade: '#4D7C72', hi: '#E9B330', red: '#D23B2C', zgreen: '#93B04B', night: '#16221C', night2: '#2C4A3E', cream: '#FFF6E6',
+  skin: '#F0C49C', hoodie: '#C9733A', pack: '#6B5A3E', cap: '#3D6F8F', pants: '#2E3B45', zshirt: '#7D8C9A' };
+const F = { serif: "'Playfair'", sans: "'Rubik'", mono: "'JBMono'", num: "'Bagel'", hand: "'Caveat'" };
+const LW = 7;
+function el(tag, attrs = {}, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function txt(parent, str, attrs) { const e = el('text', attrs, parent); e.textContent = str; return e; }
+function tf(e, x = 0, y = 0, s = 1, r = 0, sy) { e.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${r.toFixed(2)}) scale(${s.toFixed(4)} ${(sy ?? s).toFixed(4)})`); }
+function op(e, o) { e.setAttribute('opacity', Math.max(0, Math.min(1, o)).toFixed(3)); }
+function show(e, v) { e.style.display = v ? '' : 'none'; }
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, p) => a + (b - a) * p;
+const E = { out: p => 1 - Math.pow(1 - p, 3), in: p => p * p * p, io: p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2,
+  back: p => { const c = 1.9; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); } };
+const pop = (t, t0, d = .35) => t < t0 ? 0 : E.back(seg(t, t0, t0 + d));
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const mctx = document.createElement('canvas').getContext('2d');
+function measure(str, size, family, weight = 900) { mctx.font = `${weight} ${size}px ${family}`; return mctx.measureText(str).width; }
+
+// per-character text with misregistration shadow
+function chars(parent, str, o) {
+  const { x, y, size, family, weight = 900, fill = C.ink, anchor = 'start', ls = 0, shadow, stroke, sw = 0 } = o;
+  const g = el('g', {}, parent), arr = [...str], widths = arr.map(c => measure(c, size, family, weight));
+  const total = widths.reduce((a, b) => a + b, 0) + ls * (arr.length - 1);
+  let cx = anchor === 'middle' ? x - total / 2 : anchor === 'end' ? x - total : x;
+  const items = arr.map((ch, i) => {
+    const cg = el('g', {}, g), base = { x: 0, y: 0, 'font-size': size, 'font-family': family, 'font-weight': weight, 'text-anchor': 'middle' };
+    if (shadow) txt(cg, ch, { ...base, x: shadow.dx, y: shadow.dy, fill: shadow.fill, class: 'mul' });
+    const st = stroke ? { stroke, 'stroke-width': sw, 'paint-order': 'stroke', 'stroke-linejoin': 'round' } : {};
+    txt(cg, ch, { ...base, fill, ...st });
+    const it = { g: cg, x: cx + widths[i] / 2, y, w: widths[i], size }; cx += widths[i] + ls; tf(cg, it.x, it.y); return it;
+  });
+  return { g, items, total };
+}
+function charsPop(c, t, t0, stagger = .05, d = .38, from = 60) {
+  c.items.forEach((it, i) => {
+    const s = t0 + i * stagger, p = seg(t, s, s + d), h = it.size * .35;
+    if (t < s) { op(it.g, 0); return; } op(it.g, 1);
+    const sc = E.back(p), sq = 1 + .25 * Math.sin(p * Math.PI) * (1 - p);
+    it.g.setAttribute('transform', `translate(${it.x} ${it.y + from * (1 - E.out(p))}) translate(0 ${-h}) scale(${(sc / sq).toFixed(3)} ${(sc * sq).toFixed(3)}) translate(0 ${h})`);
+  });
+}
+// halftone dots: f(x,y) → 0..1
+function halftone(parent, { x0 = 0, y0 = 0, w = W, h = H, step = 24, angle = 15, color, f, maxK = .62 }) {
+  const a = angle * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), n = Math.ceil(Math.hypot(w, h) / step / 2) + 2; let d = '';
+  for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) {
+    const u = i * step, v = j * step, x = x0 + w / 2 + u * ca - v * sa, y = y0 + h / 2 + u * sa + v * ca;
+    if (x < x0 - step || x > x0 + w + step || y < y0 - step || y > y0 + h + step) continue;
+    const s = clamp(f(x, y)); if (s < .05) continue; const r = s * step * maxK;
+    d += `M${(x - r).toFixed(1)} ${y.toFixed(1)}a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(2 * r).toFixed(1)} 0a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(-2 * r).toFixed(1)} 0`;
+  }
+  return el('path', { d, fill: color }, parent);
+}
+const radial = (cx, cy, R, pw = 1.2) => (x, y) => Math.pow(clamp(1 - Math.hypot(x - cx, y - cy) / R), pw);
+const edge = (R = 1100, pw = 1.6) => (x, y) => Math.pow(clamp(Math.hypot((x - 540) * 1.6, y - 960) / R - .35), pw) * 1.3;
+const ramp = (y0, y1) => (x, y) => clamp((y - y0) / (y1 - y0));
+function bg(parent, color) { return el('rect', { width: W, height: H, fill: color }, parent); }
+let numId = 0;
+function bigNum(parent, str, { x, y, size, fill = C.hi, dots = C.ink, shadow = C.shade, anchor = 'start' }) {   // halftone-filled giant numeral
+  const g = el('g', {}, parent), id = 'nclip' + (numId++), base = { x, y, 'font-size': size, 'font-family': F.num, 'font-weight': 400, 'text-anchor': anchor };
+  txt(g, str, { ...base, x: x + 14, y: y + 14, fill: shadow, class: 'mul' });
+  const cp = el('clipPath', { id }, el('defs', {}, g)); txt(cp, str, base);
+  txt(g, str, { ...base, fill });
+  const hg = el('g', { 'clip-path': `url(#${id})`, class: 'mul' }, g); halftone(hg, { color: dots, step: 22, angle: 30, f: ramp(y - size * .8, y + size * .1), maxK: .55 });
+  return g;
+}
+function stampEl(parent, str, { size = 120, color = C.red, family = F.sans, padX = 40, padY = 20, border = 10 } = {}) {
+  const g = el('g', {}, parent), inner = el('g', { filter: 'url(#stampInk)' }, g);
+  const w = measure(str, size, family, 900) + padX * 2, h = size * 1.08 + padY * 2;
+  el('rect', { x: -w / 2, y: -h / 2, width: w, height: h, rx: 20, fill: 'none', stroke: color, 'stroke-width': border }, inner);
+  el('rect', { x: -w / 2 + border * 1.8, y: -h / 2 + border * 1.8, width: w - border * 3.6, height: h - border * 3.6, rx: 10, fill: 'none', stroke: color, 'stroke-width': border * .35 }, inner);
+  txt(inner, str, { x: 0, y: size * .36, 'font-size': size, 'font-family': family, 'font-weight': 900, fill: color, 'text-anchor': 'middle' });
+  return { g, w, h };
+}
+function stampAnim(s, t, t0, x, y, rot) {
+  if (t < t0 - .09) { op(s.g, 0); return; }
+  const p = seg(t, t0 - .09, t0), after = Math.max(0, t - t0), bounce = 1 + .05 * Math.sin(after * 30) * Math.exp(-after * 9);
+  op(s.g, p < 1 ? .3 + .7 * p : .93); tf(s.g, x, y, lerp(2.6, 1, E.in(p)) * bounce, rot);
+}
+function riseIn(g, t, t0, x, y, s = 1, r = 0, d = .4, from = 300) { if (t < t0) { op(g, 0); return; } op(g, 1); const p = E.back(seg(t, t0, t0 + d)); tf(g, x, y + from * (1 - E.out(seg(t, t0, t0 + d))), s * lerp(.6, 1, p), r); }
+function scaleIn(g, t, t0, x, y, s = 1, r = 0, d = .35) { if (t < t0) { op(g, 0); return; } op(g, 1); tf(g, x, y, s * pop(t, t0, d), r); }
+
+// ───────────────────────────── characters (chunky, ink outline, glossy eyes)
+function eye(parent, x, y, rx = 13, ry = 17) { const g = el('g', {}, parent); el('ellipse', { cx: x, cy: y, rx, ry, fill: C.ink }, g); el('ellipse', { cx: x + rx * .3, cy: y - ry * .35, rx: rx * .38, ry: ry * .32, fill: '#fff' }, g); el('circle', { cx: x - rx * .35, cy: y + ry * .35, r: rx * .18, fill: '#fff' }, g); return g; }
+function limb(parent, x, y, w, h, fill) { const g = el('g', {}, parent); el('rect', { x: -w / 2, y: 0, width: w, height: h, rx: w / 2, fill, stroke: C.ink, 'stroke-width': LW }, g); tf(g, x, y); return g; }
+// hero: hoodie, backpack, beanie. pose: {armL, armR (deg, 0 = down), mouth:'o'|'flat'|'smile'|'shh'|'grit', eyes:1|0, brow:-1..1, lean}
+function hero(parent) {
+  const root = el('g', {}, parent), b = el('g', { filter: 'url(#boil)' }, root);
+  const pack = el('rect', { x: -95, y: -300, width: 70, height: 150, rx: 22, fill: C.pack, stroke: C.ink, 'stroke-width': LW }, b);
+  const armL = limb(b, -62, -290, 40, 150, C.hoodie);
+  const legL = limb(b, -28, -150, 46, 150, C.pants), legR = limb(b, 28, -150, 46, 150, C.pants);
+  el('ellipse', { cx: -24, cy: 4, rx: 36, ry: 16, fill: C.ink }, b); el('ellipse', { cx: 34, cy: 4, rx: 36, ry: 16, fill: C.ink }, b);
+  el('rect', { x: -78, y: -330, width: 156, height: 200, rx: 60, fill: C.hoodie, stroke: C.ink, 'stroke-width': LW }, b);
+  el('path', { d: 'M -20 -300 Q 0 -270 20 -300', fill: 'none', stroke: C.ink, 'stroke-width': 5, 'stroke-linecap': 'round' }, b);
+  const head = el('g', {}, b);
+  el('ellipse', { cx: 0, cy: -420, rx: 92, ry: 98, fill: C.skin, stroke: C.ink, 'stroke-width': LW }, head);
+  el('path', { d: 'M -96 -430 Q -96 -540 0 -548 Q 96 -540 96 -430 Q 50 -452 0 -452 Q -50 -452 -96 -430 Z', fill: C.cap, stroke: C.ink, 'stroke-width': LW }, head);
+  el('circle', { cx: 0, cy: -556, r: 20, fill: C.cap, stroke: C.ink, 'stroke-width': LW }, head);
+  const eyes = el('g', {}, head); eye(eyes, -32, -410); eye(eyes, 32, -410);
+  const shut = el('g', {}, head); for (const x of [-32, 32]) el('path', { d: `M ${x - 15} -408 Q ${x} -398 ${x + 15} -408`, fill: 'none', stroke: C.ink, 'stroke-width': 6, 'stroke-linecap': 'round' }, shut);
+  const browL = el('path', { d: '', fill: 'none', stroke: C.ink, 'stroke-width': 7, 'stroke-linecap': 'round' }, head), browR = el('path', { d: '', fill: 'none', stroke: C.ink, 'stroke-width': 7, 'stroke-linecap': 'round' }, head);
+  const mouth = el('path', { d: '', fill: C.ink, stroke: C.ink, 'stroke-width': 5, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }, head);
+  const finger = el('rect', { x: -8, y: -400, width: 16, height: 62, rx: 8, fill: C.skin, stroke: C.ink, 'stroke-width': 5 }, head);
+  const armR = limb(b, 62, -290, 40, 150, C.hoodie);
+  const prop = el('g', {}, armR);
+  return { root, armL, armR, legL, legR, head, eyes, shut, browL, browR, mouth, finger, prop, pack };
+}
+function heroPose(h, P = {}) {
+  const t = P.t || 0, br = P.brow ?? 0;
+  tf(h.armL, -62, -290, 1, P.armL ?? 8); tf(h.armR, 62, -290, 1, P.armR ?? -8);
+  tf(h.legL, -28, -150, 1, P.legL ?? 0); tf(h.legR, 28, -150, 1, P.legR ?? 0);
+  show(h.eyes, (P.eyes ?? 1) > .5); show(h.shut, (P.eyes ?? 1) <= .5);
+  h.browL.setAttribute('d', `M -52 ${-448 - br * 6} L -14 ${-446 + br * 8}`); h.browR.setAttribute('d', `M 52 ${-448 - br * 6} L 14 ${-446 + br * 8}`);
+  const m = P.mouth || 'flat';
+  h.mouth.setAttribute('d', m === 'o' ? 'M -14 -360 Q 0 -390 14 -360 Q 0 -340 -14 -360 Z' : m === 'smile' ? 'M -26 -366 Q 0 -340 26 -366 Q 0 -352 -26 -366 Z' : m === 'grit' ? 'M -24 -362 L 24 -362 L 24 -350 L -24 -350 Z' : 'M -20 -360 L 20 -360');
+  show(h.finger, m === 'shh');
+  tf(h.head, 0, Math.sin(t * 2.2) * 3, 1, P.headR ?? 0);
+}
+// zombie: green skin, torn shirt, arms forward, droopy eyes
+function zombie(parent) {
+  const root = el('g', {}, parent), b = el('g', { filter: 'url(#boil)' }, root);
+  const armL = limb(b, -60, -290, 38, 160, C.zgreen);
+  const legL = limb(b, -28, -150, 44, 150, C.pants), legR = limb(b, 28, -150, 44, 150, C.pants);
+  el('ellipse', { cx: -24, cy: 4, rx: 34, ry: 15, fill: C.ink }, b); el('ellipse', { cx: 34, cy: 4, rx: 34, ry: 15, fill: C.ink }, b);
+  el('path', { d: 'M -76 -320 Q -78 -150 -70 -130 L -40 -150 L -20 -128 L 4 -152 L 30 -126 L 50 -150 L 72 -132 Q 80 -150 76 -320 Q 0 -350 -76 -320 Z', fill: C.zshirt, stroke: C.ink, 'stroke-width': LW, 'stroke-linejoin': 'round' }, b);
+  const head = el('g', {}, b);
+  el('ellipse', { cx: 6, cy: -418, rx: 88, ry: 94, fill: C.zgreen, stroke: C.ink, 'stroke-width': LW }, head);
+  el('path', { d: 'M -70 -470 L -40 -500 L -30 -470 L 0 -508 L 10 -472 L 40 -498 L 46 -466', fill: 'none', stroke: C.ink, 'stroke-width': 6, 'stroke-linejoin': 'round' }, head);
+  for (const x of [-24, 40]) { el('ellipse', { cx: x, cy: -420, rx: 20, ry: 16, fill: '#F6F1DE', stroke: C.ink, 'stroke-width': 5 }, head); el('circle', { cx: x + 4, cy: -418, r: 5, fill: C.ink }, head); el('path', { d: `M ${x - 22} -428 Q ${x} -440 ${x + 22} -428`, fill: 'none', stroke: C.ink, 'stroke-width': 6 }, head); }
+  const mouth = el('path', { d: 'M -28 -364 L -16 -352 L -4 -366 L 8 -352 L 20 -366 L 34 -354', fill: 'none', stroke: C.ink, 'stroke-width': 6, 'stroke-linejoin': 'round' }, head);
+  const armR = limb(b, 70, -290, 38, 160, C.zgreen);
+  return { root, armL, armR, legL, legR, head };
+}
+function zombiePose(z, P = {}) { const t = P.t || 0; tf(z.armL, -60, -290, 1, (P.armL ?? -95) + Math.sin(t * 3) * 4); tf(z.armR, 70, -290, 1, (P.armR ?? -85) + Math.sin(t * 3 + 1) * 4); tf(z.head, 0, 0, 1, (P.headR ?? 8) + Math.sin(t * 1.7) * 3); tf(z.legL, -28, -150, 1, P.legL ?? 0); tf(z.legR, 28, -150, 1, P.legR ?? 0); }
+function personIcon(parent, x, y, s, fill = C.ink) { const g = el('g', {}, parent); el('circle', { cx: 0, cy: -150, r: 38, fill }, g); el('rect', { x: -48, y: -104, width: 96, height: 110, rx: 40, fill }, g); tf(g, x, y, s); return g; }
+
+// ───────────────────────────── caption bar: two lines max, keyword in highlight ink
+function captionBar(parent, text, key) {
+  const g = el('g', {}, parent), inner = el('g', {}, g), size = 46, maxW = 900;
+  const words = text.split(' '); let rows = [text];
+  if (measure(text, size, F.sans, 800) > maxW) { let best = 1, bd = 1e9; for (let i = 1; i < words.length; i++) { const d = Math.abs(measure(words.slice(0, i).join(' '), size, F.sans, 800) - measure(words.slice(i).join(' '), size, F.sans, 800)); if (d < bd) { bd = d; best = i; } } rows = [words.slice(0, best).join(' '), words.slice(best).join(' ')]; }
+  const w = Math.max(...rows.map(r => measure(r, size, F.sans, 800))), padX = 34, hgt = size * 1.25 * rows.length + 30;
+  el('rect', { x: -w / 2 - padX + 8, y: -hgt / 2 + 8, width: w + padX * 2, height: hgt, rx: 18, fill: C.shade, class: 'mul' }, inner);
+  el('rect', { x: -w / 2 - padX, y: -hgt / 2, width: w + padX * 2, height: hgt, rx: 18, fill: C.ink }, inner);
+  rows.forEach((r, i) => {
+    const t = el('text', { x: 0, y: -hgt / 2 + 15 + size * 1.25 * i + size * .98, 'font-size': size, 'font-family': F.sans, 'font-weight': 800, 'text-anchor': 'middle' }, inner);
+    r.split(/(\s+)/).forEach(part => { const sp = el('tspan', { fill: key && part.toLowerCase().replace(/[^а-яё0-9]/g, '').startsWith(key) ? C.hi : C.cream }, t); sp.textContent = part; });
+  });
+  return { g };
+}
+
+// ───────────────────────────── scenes
+const world = document.getElementById('world'), cam = document.getElementById('cam'), hud = document.getElementById('hud'), caps = document.getElementById('caps'), wipe = document.getElementById('wipe'), flash = document.getElementById('flash');
+const scenes = []; let TL, AT, VO, D, DUR;
+function scene(t0, t1, build) { const g = el('g', {}, world), s = { g, t0, t1 }; s.update = build(g, s); scenes.push(s); return s; }
+const SHAKES = [], FLASH = [], WIPES = [];
+const shake = (t0, a = 16, d = .3) => SHAKES.push([t0, a, d]);
+
+function buildAll() {
+  const V = VO, L = id => V[id], end = id => V[id] + D[id];
+  // cut points (each on a word)
+  const tNine = AT('l01', 'девять') - .08, tDie = AT('l01', 'погибнут'), tNot = L('l02') - .2, tList = L('l03') - .25, tSecret = AT('l03', 'засекречено'), tWatch = AT('l03', 'досмотри');
+  const R = ['l04', 'l05', 'l06', 'l07', 'l08', 'l09'].map(id => L(id) - .25);
+  const t7 = L('l10') - .3, tReveal = AT('l11', 'самые', 1) - .05, tLive = AT('l11', 'живые'), tFood = AT('l11', 'кончилась'), tEnd = L('l12') - .2;
+  TL = { tNine, tDie, tNot, tList, tSecret, tWatch, R, t7, tReveal, tLive, tFood, tEnd };
+
+  // ── 0: the case opens (hook)
+  scene(0, tNine, (g) => {
+    bg(g, C.paper);
+    halftone(g, { color: C.red, step: 24, angle: 20, f: radial(980, 300, 700, 1.1), maxK: .6 }).setAttribute('class', 'mul');
+    halftone(g, { color: C.shade, step: 24, angle: 65, f: edge(1100, 1.4), maxK: .62 }).setAttribute('class', 'mul');
+    const a = chars(g, 'ЕСЛИ ЗАВТРА', { x: 70, y: 380, size: 92, family: F.sans, fill: C.ink });
+    const b = chars(g, 'ЗОМБИ-', { x: 60, y: 640, size: 200, family: F.serif, fill: C.ink, shadow: { fill: C.shade, dx: 10, dy: 10 } });
+    const c2 = chars(g, 'АПОКА-', { x: 60, y: 850, size: 200, family: F.serif, fill: C.ink, shadow: { fill: C.shade, dx: 10, dy: 10 } });
+    const d2 = chars(g, 'ЛИПСИС', { x: 60, y: 1060, size: 200, family: F.serif, fill: C.ink, shadow: { fill: C.shade, dx: 10, dy: 10 } });
+    const zg = el('g', {}, g), z = zombie(zg);
+    const st = stampEl(g, 'ВСПЫШКА', { size: 110 });
+    const tz = AT('l01', 'зомби'), tApo = AT('l01', 'апокалипсис');
+    shake(tz + .1, 14, .3); shake(tApo + .45, 10, .25);
+    return (t) => {
+      charsPop(a, t, .02, .02, .25, 40); charsPop(b, t, .18, .04, .3, 70); charsPop(c2, t, .42, .035, .28, 70); charsPop(d2, t, .62, .035, .28, 70);
+      stampAnim(st, t, tz + .1, 680, 470, -9);
+      zombiePose(z, { t }); riseIn(zg, t, .85, 760, 1640, 1.05, -4, .5, 700);
+    };
+  });
+  // ── 1: 9 of 10
+  scene(tNine, tNot, (g) => {
+    bg(g, C.paper);
+    halftone(g, { color: C.hi, step: 24, angle: 15, f: radial(540, 700, 760, 1.0), maxK: .66 });
+    const num = bigNum(g, '9/10', { x: 540, y: 820, size: 430, anchor: 'middle' }); op(num, 0);
+    const head = chars(g, 'ПОГИБНУТ', { x: 540, y: 1000, size: 120, family: F.serif, fill: C.red, anchor: 'middle', shadow: { fill: C.ink, dx: 7, dy: 7 } });
+    const sub = chars(g, 'В ПЕРВЫЕ СУТКИ', { x: 540, y: 1100, size: 64, family: F.sans, fill: C.ink, anchor: 'middle', ls: 4 });
+    const icons = [], crosses = [];
+    for (let i = 0; i < 10; i++) { const x = 160 + (i % 5) * 190, y = 1420 + Math.floor(i / 5) * 230; icons.push(personIcon(g, x, y, .9, i === 9 ? C.shade : C.ink));
+      const cr = el('g', {}, g); el('path', { d: 'M -60 -190 L 60 -10 M 60 -190 L -60 -10', stroke: C.red, 'stroke-width': 16, 'stroke-linecap': 'round' }, cr); tf(cr, x, y); crosses.push(cr); }
+    shake(tNine + .05, 18, .35);
+    return (t) => {
+      const p = seg(t, tNine, tNine + .3); op(num, t >= tNine ? 1 : 0); tf(num, 540 * (1 - E.back(p)) * 0, 0, 1);
+      num.setAttribute('transform', `translate(540 600) scale(${lerp(1.8, 1, E.back(p)).toFixed(3)}) translate(-540 -600)`);
+      charsPop(head, t, tDie - .05, .04, .3, 50); charsPop(sub, t, tDie + .45, .02, .28, 30);
+      icons.forEach((ic, i) => scaleIn(ic, t, tNine + .15 + i * .05, 160 + (i % 5) * 190, 1420 + Math.floor(i / 5) * 230, .9));
+      crosses.forEach((cr, i) => { if (i === 9) { op(cr, 0); return; } const t0 = tDie + .1 + i * .12; scaleIn(cr, t, t0, 160 + (i % 5) * 190, 1420 + Math.floor(i / 5) * 230, 1, 0, .2); });
+    };
+  });
+  // ── 2: not the zombies? (night card)
+  scene(tNot, tList, (g) => {
+    bg(g, C.night);
+    halftone(g, { color: C.night2, step: 24, angle: 25, f: radial(540, 1100, 900, .9), maxK: .62 });
+    const q = chars(g, 'НЕ ЗОМБИ?', { x: 540, y: 470, size: 170, family: F.serif, fill: C.hi, anchor: 'middle', shadow: { fill: C.red, dx: 9, dy: 9 } });
+    const zg = el('g', {}, g), z = zombie(zg);
+    const huh = chars(g, '?!', { x: 820, y: 900, size: 200, family: F.hand, weight: 700, fill: C.cream, anchor: 'middle', stroke: C.ink, sw: 10 });
+    const tz = AT('l02', 'зомби');
+    return (t) => {
+      charsPop(q, t, tz - .1, .05, .32, 60);
+      const shrug = E.back(seg(t, tz, tz + .4));
+      zombiePose(z, { t, armL: lerp(-95, -150, shrug), armR: lerp(-85, 150, shrug), headR: lerp(8, -10, shrug) });
+      tf(zg, 520, 1650, lerp(1.2, 1.32, seg(t, tNot, tList)));
+      charsPop(huh, t, tz + .25, .08, .3, 40);
+    };
+  });
+  // ── 3: the 7 rules, the 7th classified
+  scene(tList, R[0], (g) => {
+    bg(g, C.paper);
+    halftone(g, { color: C.shade, step: 24, angle: 45, f: edge(1000, 1.3), maxK: .6 }).setAttribute('class', 'mul');
+    const h1 = chars(g, '7 ПРАВИЛ', { x: 540, y: 330, size: 150, family: F.serif, fill: C.ink, anchor: 'middle', shadow: { fill: C.hi, dx: 9, dy: 9 } });
+    const h2 = chars(g, 'ВЫЖИВАНИЯ', { x: 540, y: 470, size: 110, family: F.serif, fill: C.ink, anchor: 'middle' });
+    const cards = [];
+    for (let i = 0; i < 7; i++) {
+      const cg = el('g', {}, g);
+      el('rect', { x: -120, y: -170, width: 240, height: 340, rx: 18, fill: i === 6 ? C.ink : C.cream, stroke: C.ink, 'stroke-width': 6 }, cg);
+      txt(cg, String(i + 1), { x: 0, y: 60, 'font-size': 190, 'font-family': F.num, fill: i === 6 ? C.hi : C.ink, 'text-anchor': 'middle' });
+      txt(cg, 'ПРАВИЛО', { x: 0, y: -120, 'font-size': 30, 'font-family': F.mono, 'font-weight': 800, fill: i === 6 ? C.cream : C.ink, 'text-anchor': 'middle' });
+      cards.push(cg);
+    }
+    const st = stampEl(g, 'СЕКРЕТНО', { size: 72, border: 8 });
+    const watch = chars(g, 'досмотри!', { x: 690, y: 1640, size: 120, family: F.hand, weight: 700, fill: C.red, anchor: 'middle' });
+    const arrow = el('path', { d: 'M 0 0 C 60 -60 140 -80 200 -40 M 200 -40 L 160 -60 M 200 -40 L 180 0', fill: 'none', stroke: C.red, 'stroke-width': 10, 'stroke-linecap': 'round' }, g);
+    shake(tSecret + .1, 20, .4);
+    return (t) => {
+      charsPop(h1, t, tList + .15, .04, .3, 60); charsPop(h2, t, tList + .45, .03, .3, 40);
+      cards.forEach((cg, i) => { const a = (i - 3) * 10.5, p = E.back(seg(t, tList + .4 + i * .06, tList + .8 + i * .06)); if (t < tList + .4 + i * .06) { op(cg, 0); return; } op(cg, 1);
+        const x = 540 + Math.sin(a * Math.PI / 180) * 600 * p, y = 1480 - Math.cos(a * Math.PI / 180) * 600 * p + 40; tf(cg, x, y + (i === 6 && t > tSecret ? Math.sin(t * 40) * 4 * Math.exp(-(t - tSecret) * 4) : 0), 1, a * p); });
+      const c7 = 540 + Math.sin(31.5 * Math.PI / 180) * 600, y7 = 1480 - Math.cos(31.5 * Math.PI / 180) * 600 + 40;
+      stampAnim(st, t, tSecret + .1, c7 - 40, y7, 31.5 - 12);
+      charsPop(watch, t, tWatch - .05, .05, .3, 40); if (t < tWatch + .3) op(arrow, 0); else { op(arrow, 1); tf(arrow, 820, 1700, 1, -30); }
+    };
+  });
+  // ── 4–9: rules 1–6 (dot wipe in, giant numeral, headline on the key word, scene, ✓)
+  const RULES = [
+    { id: 'l04', n: '01', head: ['НЕ', 'БЕГИ'], key: 'беги', inter: 'паника убивает', ikey: 'паника', col: C.paper },
+    { id: 'l05', n: '02', head: ['ВОДА', '> ОРУЖИЯ'], key: 'вода', inter: 'без воды — 3 дня', ikey: 'оружия', col: C.paper },
+    { id: 'l06', n: '03', head: ['ТИШИНА'], key: 'тишина', inter: 'они идут на звук', ikey: 'звук', col: C.night },
+    { id: 'l07', n: '04', head: ['ВЫШЕ —', 'БЕЗОПАСНЕЕ'], key: 'выше', inter: 'лестница = стена', ikey: 'выше', col: C.paper },
+    { id: 'l08', n: '05', head: ['ДОЗОРНЫЙ'], key: 'дозорного', inter: 'спи по очереди', ikey: 'никогда', col: C.night },
+    { id: 'l09', n: '06', head: ['КАРАНТИН'], key: 'царапина', inter: 'даже у друга', ikey: 'друга', col: C.paper },
+  ];
+  RULES.forEach((r, k) => {
+    const t0 = R[k], t1 = k < 5 ? R[k + 1] : t7, dark = r.col === C.night, ink = dark ? C.cream : C.ink;
+    WIPES.push([t0, k % 2 ? C.hi : C.shade]);
+    scene(t0, t1, (g) => {
+      bg(g, r.col);
+      halftone(g, { color: dark ? C.night2 : C.hi, step: 24, angle: 15 + k * 10, f: radial(800, 300, 760, 1.0), maxK: .62 });
+      if (!dark) halftone(g, { color: C.shade, step: 24, angle: 70, f: edge(1100, 1.5), maxK: .6 }).setAttribute('class', 'mul');
+      const num = bigNum(g, r.n, { x: 40, y: 560, size: 520, fill: dark ? C.hi : C.hi, dots: C.ink });
+      const tag = chars(g, 'ПРАВИЛО', { x: 70, y: 150, size: 44, family: F.mono, weight: 800, fill: ink, ls: 6 });
+      const tk = AT(r.id, r.key) - .05;
+      const heads = r.head.map((h, i) => chars(g, h, { x: 70, y: 760 + i * 150, size: r.head.length > 1 && h.length > 7 ? 120 : 150, family: F.serif, fill: dark ? C.hi : C.ink, shadow: { fill: dark ? C.red : C.shade, dx: 9, dy: 9 } }));
+      const stage = el('g', {}, g);
+      const inter = chars(g, r.inter, { x: 540, y: 1590, size: 86, family: F.hand, weight: 700, fill: dark ? C.cream : C.red, anchor: 'middle' });
+      const ok = stampEl(g, '✓ ЖИВ', { size: 70, color: C.red, border: 8 });
+      const ti = AT(r.id, r.ikey);
+      // per-rule scene
+      let upd = () => {};
+      if (k === 0) {        // calm hero in a burst of panic
+        const burst = el('g', {}, stage); for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; el('path', { d: `M ${Math.cos(a) * 250} ${Math.sin(a) * 250 - 300} L ${Math.cos(a + .08) * 420} ${Math.sin(a + .08) * 420 - 300} L ${Math.cos(a + .16) * 260} ${Math.sin(a + .16) * 260 - 300}`, fill: C.red, opacity: .85 }, burst); }
+        const hg = el('g', {}, stage), h = hero(hg);
+        upd = t => { heroPose(h, { t, eyes: t > tk + .3 ? 0 : 1, mouth: 'flat', armL: 25, armR: -25, brow: .3 }); tf(burst, 0, 0, 1 + .04 * Math.sin(t * 12), t * 20); scaleIn(hg, t, t0 + .2, 0, 0, .95); };
+      } else if (k === 1) { // a bottle bigger than the axe
+        const bottle = el('g', { filter: 'url(#boil)' }, stage);
+        el('rect', { x: -70, y: -420, width: 140, height: 360, rx: 36, fill: '#9EC9D6', stroke: C.ink, 'stroke-width': LW }, bottle); el('rect', { x: -34, y: -470, width: 68, height: 60, rx: 10, fill: C.cap, stroke: C.ink, 'stroke-width': LW }, bottle); el('rect', { x: -70, y: -300, width: 140, height: 90, fill: C.cream, stroke: C.ink, 'stroke-width': 5 }, bottle);
+        txt(bottle, 'H₂O', { x: 0, y: -238, 'font-size': 44, 'font-family': F.sans, 'font-weight': 900, fill: C.ink, 'text-anchor': 'middle' });
+        const axe = el('g', { filter: 'url(#boil)' }, stage); el('rect', { x: -10, y: -260, width: 20, height: 240, rx: 8, fill: C.pack, stroke: C.ink, 'stroke-width': 5 }, axe); el('path', { d: 'M 10 -250 Q 80 -250 90 -190 Q 60 -200 10 -190 Z', fill: '#B9C1C7', stroke: C.ink, 'stroke-width': 5 }, axe);
+        const gt = txt(stage, '>', { x: 0, y: -170, 'font-size': 200, 'font-family': F.num, fill: C.red, 'text-anchor': 'middle' });
+        upd = t => { scaleIn(bottle, t, tk, -230, 80, .9); scaleIn(axe, t, tk + .5, 250, 80, .7, 18); scaleIn(gt, t, tk + .3, 20, 40, .9); };
+      } else if (k === 2) { // shh — a zombie listens
+        const hg = el('g', {}, stage), h = hero(hg), zg = el('g', {}, stage), z = zombie(zg);
+        const waves = el('g', {}, stage); for (let i = 1; i <= 3; i++) el('path', { d: `M ${-40 * i} ${-60 * i} Q ${-60 * i} 0 ${-40 * i} ${60 * i}`, fill: 'none', stroke: C.hi, 'stroke-width': 8, 'stroke-linecap': 'round' }, waves);
+        upd = t => { heroPose(h, { t, mouth: 'shh', brow: .6 }); scaleIn(hg, t, t0 + .2, -210, 0, .8); zombiePose(z, { t, headR: -15 }); riseIn(zg, t, ti - .4, 260, 0, .8, 0, .5, 500); op(waves, t > ti ? .5 + .5 * Math.sin(t * 10) : 0); tf(waves, 120, -380, 1); };
+      } else if (k === 3) { // a building: hero on the roof, zombies stuck at the stairs
+        const bld = el('g', { filter: 'url(#boil)' }, stage); el('rect', { x: -170, y: -720, width: 340, height: 720, fill: C.zshirt, stroke: C.ink, 'stroke-width': LW }, bld);
+        for (let r2 = 0; r2 < 5; r2++) for (let c2 = 0; c2 < 3; c2++) el('rect', { x: -130 + c2 * 95, y: -680 + r2 * 130, width: 60, height: 80, fill: C.night2, stroke: C.ink, 'stroke-width': 4 }, bld);
+        const hg = el('g', {}, stage), h = hero(hg); const zs = [-260, 270, 330].map(x => { const zg = el('g', {}, stage), z = zombie(zg); return { zg, z, x }; });
+        upd = t => { riseIn(bld, t, t0 + .1, 0, 40, .6, 0, .5, 900); heroPose(h, { t, mouth: 'smile', armR: -150, brow: -.2 }); scaleIn(hg, t, tk + .1, 0, -385, .36); zs.forEach((q, i) => { zombiePose(q.z, { t: t + i }); riseIn(q.zg, t, ti - .2 + i * .1, q.x, 40, .45, 0, .4, 400); }); };
+      } else if (k === 4) { // night watch: sleepers + hero with a flashlight beam
+        const fire = el('g', {}, stage); el('path', { d: 'M -60 0 Q -70 -90 -10 -150 Q -20 -80 20 -60 Q 30 -120 60 -150 Q 80 -70 60 0 Z', fill: C.hi, stroke: C.ink, 'stroke-width': 6 }, fire); el('path', { d: 'M -30 0 Q -30 -50 0 -80 Q 20 -40 30 0 Z', fill: C.red }, fire);
+        const beam = el('path', { d: 'M 0 0 L 520 -170 L 520 170 Z', fill: C.hi, opacity: .35 }, stage);
+        const sl = el('g', { filter: 'url(#boil)' }, stage); el('rect', { x: -170, y: -60, width: 300, height: 70, rx: 34, fill: C.cap, stroke: C.ink, 'stroke-width': LW }, sl); el('ellipse', { cx: -200, cy: -40, rx: 52, ry: 50, fill: C.skin, stroke: C.ink, 'stroke-width': LW }, sl);
+        txt(sl, 'z z z', { x: -230, y: -120, 'font-size': 60, 'font-family': F.hand, 'font-weight': 700, fill: C.cream });
+        const hg = el('g', {}, stage), h = hero(hg); el('rect', { x: -12, y: 130, width: 24, height: 70, rx: 6, fill: C.ink }, h.prop);
+        upd = t => { tf(fire, 0, 0, 1 + .05 * Math.sin(t * 17), 0, 1 + .08 * Math.sin(t * 13)); heroPose(h, { t, armR: -95, brow: .7, mouth: 'flat' }); scaleIn(hg, t, t0 + .2, 300, 0, .8); scaleIn(sl, t, t0 + .35, -170, 0, 1); op(beam, t > tk ? .3 + .1 * Math.sin(t * 9) : 0); tf(beam, 350, -280, 1, -10 + 6 * Math.sin(t * 1.3)); };
+      } else {              // quarantine: a friend with a scratch behind tape
+        const hg = el('g', {}, stage), h = hero(hg);
+        const scr = el('path', { d: 'M -20 60 L 10 80 M -10 90 L 22 106', stroke: C.red, 'stroke-width': 9, 'stroke-linecap': 'round' }, h.armL);
+        const tape = el('g', {}, stage); for (const [y, a] of [[-380, -8], [-150, 7]]) { const tg = el('g', {}, tape); el('rect', { x: -620, y: -40, width: 1240, height: 80, fill: C.hi, stroke: C.ink, 'stroke-width': 5 }, tg); for (let i = -6; i < 7; i++) el('path', { d: `M ${i * 100} -40 L ${i * 100 + 60} 40 L ${i * 100 + 100} 40 L ${i * 100 + 40} -40 Z`, fill: C.ink }, tg); tf(tg, 0, y, 1, a); }
+        upd = t => { heroPose(h, { t, mouth: 'o', brow: -.6, armL: 40 }); scaleIn(hg, t, t0 + .2, 0, 0, .9); op(scr, t > tk ? 1 : 0); [...tape.children].forEach((tg, i) => { const p = E.out(seg(t, ti - .5 + i * .15, ti - .1 + i * .15)); tg.setAttribute('transform', `translate(${lerp(-1300, 0, p)} ${i ? -150 : -380}) rotate(${i ? 7 : -8})`); }); };
+      }
+      shake(ti + .15, 8, .2);
+      return (t) => {
+        const p = E.back(seg(t, t0 + .05, t0 + .4)); num.setAttribute('transform', `translate(40 560) scale(${lerp(.4, 1, p).toFixed(3)}) translate(-40 -560)`); op(num, t > t0 ? 1 : 0);
+        charsPop(tag, t, t0 + .1, .02, .25, 20);
+        heads.forEach((hc, i) => charsPop(hc, t, tk + i * .25, .045, .32, 60));
+        tf(stage, 540, 1420, 1); upd(t);
+        charsPop(inter, t, ti, .03, .3, 30);
+        stampAnim(ok, t, t1 - .55, 770, 1120, -12);
+      };
+    });
+  });
+  // ── 10: the seventh (silence, the stamp, redaction)
+  scene(t7, tReveal, (g) => {
+    bg(g, C.night);
+    halftone(g, { color: C.night2, step: 24, angle: 20, f: edge(900, 1.2), maxK: .64 });
+    const num = bigNum(g, '07', { x: 540, y: 900, size: 560, anchor: 'middle', fill: C.cream, dots: C.night2, shadow: C.red });
+    const st = stampEl(g, 'СЕКРЕТНО', { size: 120 });
+    const bars = [0, 1, 2].map(i => el('rect', { x: 120, y: 1200 + i * 110, width: 840 - i * 140, height: 70, fill: C.ink, stroke: C.cream, 'stroke-width': 3 }, g));
+    const hush = chars(g, 'о нём молчат', { x: 540, y: 1650, size: 100, family: F.hand, weight: 700, fill: C.hi, anchor: 'middle' });
+    shake(t7 + .35, 22, .4);
+    return (t) => {
+      const z = lerp(1, 1.08, seg(t, t7, tReveal)); num.setAttribute('transform', `translate(540 700) scale(${z.toFixed(3)}) translate(-540 -700)`);
+      stampAnim(st, t, t7 + .35, 540, 700, -14);
+      bars.forEach((b, i) => { const p = E.out(seg(t, t7 + .6 + i * .12, t7 + .9 + i * .12)); b.setAttribute('width', ((840 - i * 140) * p).toFixed(1)); });
+      charsPop(hush, t, AT('l10', 'молчат') - .1, .05, .3, 40);
+    };
+  });
+  // ── 11: the reveal — the living
+  FLASH.push([tReveal, .5]);
+  scene(tReveal, tEnd, (g) => {
+    bg(g, C.paper);
+    halftone(g, { color: C.red, step: 24, angle: 20, f: radial(540, 1250, 900, 1.0), maxK: .64 }).setAttribute('class', 'mul');
+    const head = chars(g, 'ЖИВЫЕ', { x: 540, y: 470, size: 205, family: F.serif, fill: C.red, anchor: 'middle', shadow: { fill: C.ink, dx: 12, dy: 12 } });
+    const pre = chars(g, 'НЕ МЁРТВЫЕ —', { x: 540, y: 230, size: 80, family: F.sans, fill: C.ink, anchor: 'middle' });
+    const zg = el('g', {}, g), z = zombie(zg), zx = el('path', { d: 'M -150 -600 L 150 0 M 150 -600 L -150 0', stroke: C.red, 'stroke-width': 22, 'stroke-linecap': 'round' }, zg);
+    const crowd = el('g', {}, g), people = [];
+    for (let i = 0; i < 7; i++) { const pg = el('g', {}, crowd), x = 100 + i * 147, s = .85 + (i % 2) * .15; personIcon(pg, 0, 0, s * 1.4, C.ink);
+      for (const dx of [-16, 16]) el('circle', { cx: dx, cy: -216 * s, r: 9, fill: C.hi }, pg); el('rect', { x: 34 * s, y: -110 * s, width: 40, height: 52, rx: 6, fill: C.cream, stroke: C.ink, 'stroke-width': 4 }, pg); people.push({ pg, x }); }
+    const food = chars(g, 'кончилась еда', { x: 540, y: 1700, size: 104, family: F.hand, weight: 700, fill: C.red, anchor: 'middle' });
+    const st = stampEl(g, 'ПРАВИЛО 7', { size: 80, color: C.ink, border: 8 });
+    const tNotDead = AT('l11', 'не мёртвые');
+    shake(tReveal + .02, 26, .45); shake(tLive, 14, .3);
+    return (t) => {
+      charsPop(pre, t, tReveal + .1, .03, .3, 30);
+      zombiePose(z, { t }); scaleIn(zg, t, tReveal + .05, 540, 1500, .9); op(zx, t > tNotDead + .3 ? 1 : 0); op(zg, t < tLive - .1 ? 1 : 0);
+      charsPop(head, t, tLive - .05, .07, .35, 80);
+      people.forEach((q, i) => riseIn(q.pg, t, tLive + .1 + i * .07, q.x, 1560, 1, 0, .45, 600));
+      charsPop(food, t, tFood - .05, .04, .3, 40);
+      stampAnim(st, t, tFood + .9, 760, 700, 10);
+    };
+  });
+  // ── 12: question + call to action → loops back to the first card
+  scene(tEnd, DUR + 1, (g) => {
+    bg(g, C.paper);
+    halftone(g, { color: C.hi, step: 24, angle: 15, f: radial(540, 900, 800, 1.0), maxK: .64 });
+    const q1 = chars(g, 'А СКОЛЬКО', { x: 70, y: 380, size: 120, family: F.serif, fill: C.ink, shadow: { fill: C.shade, dx: 8, dy: 8 } });
+    const q2 = chars(g, 'ПРОДЕРЖАЛСЯ', { x: 70, y: 520, size: 120, family: F.serif, fill: C.ink, shadow: { fill: C.shade, dx: 8, dy: 8 } });
+    const q3 = chars(g, 'БЫ ТЫ?', { x: 70, y: 660, size: 120, family: F.serif, fill: C.red, shadow: { fill: C.ink, dx: 8, dy: 8 } });
+    const dayG = el('g', {}, g); el('rect', { x: -300, y: -110, width: 600, height: 220, rx: 24, fill: C.ink }, dayG);
+    const day = txt(dayG, '', { x: 0, y: 50, 'font-size': 140, 'font-family': F.mono, 'font-weight': 800, fill: C.hi, 'text-anchor': 'middle' });
+    const bub = el('g', { filter: 'url(#boil)' }, g); el('path', { d: 'M -250 -110 Q -250 -160 -200 -160 L 200 -160 Q 250 -160 250 -110 L 250 40 Q 250 90 200 90 L -60 90 L -140 160 L -120 90 L -200 90 Q -250 90 -250 40 Z', fill: C.cream, stroke: C.ink, 'stroke-width': LW }, bub);
+    txt(bub, 'ПИШИ В', { x: 0, y: -60, 'font-size': 64, 'font-family': F.sans, 'font-weight': 900, fill: C.ink, 'text-anchor': 'middle' }); txt(bub, 'КОММЕНТАРИЯХ', { x: 0, y: 20, 'font-size': 64, 'font-family': F.sans, 'font-weight': 900, fill: C.red, 'text-anchor': 'middle' });
+    const tc = AT('l12', 'пиши');
+    return (t) => {
+      charsPop(q1, t, tEnd + .1, .04, .3, 50); charsPop(q2, t, tEnd + .35, .035, .3, 50); charsPop(q3, t, AT('l12', 'ты') - .1, .05, .3, 50);
+      scaleIn(dayG, t, tEnd + .5, 540, 1000, 1); day.textContent = 'ДЕНЬ ' + Math.max(1, Math.min(99, Math.floor((t - tEnd - .5) * 9) + 1));
+      scaleIn(bub, t, tc - .05, 540, 1450, 1, -3);
+    };
+  });
+  shake(tEnd + .5, 6, .2);
+  // HUD (case number, REC) on every card; inverted on dark cards
+  const hudG = el('g', {}, hud);
+  const hc = txt(hudG, 'ДЕЛО № Z-07 · ВСПЫШКА', { x: 50, y: 78, 'font-size': 30, 'font-family': F.mono, 'font-weight': 800, 'letter-spacing': 2 });
+  const rec = el('circle', { cx: 860, cy: 68, r: 12, fill: C.red }, hudG);
+  const hr = txt(hudG, 'REC 11.11', { x: 1030, y: 78, 'font-size': 30, 'font-family': F.mono, 'font-weight': 800, 'text-anchor': 'end' });
+  const darkAt = t => (t >= tNot && t < tList) || (t >= R[2] && t < R[3]) || (t >= R[4] && t < R[5]) || (t >= t7 && t < tReveal);
+  hudUpdate = t => { const col = darkAt(t) ? C.cream : C.ink; hc.setAttribute('fill', col); hr.setAttribute('fill', col); op(rec, Math.floor(t * 2) % 2 ? 1 : .2); };
+  // caption bars: the spoken line, chunked
+  const KEYS = { l01: 'девять', l02: 'зомби', l03: 'засекречено', l04: 'паника', l05: 'вода', l06: 'тишина', l07: 'выше', l08: 'дозорного', l09: 'карантин', l10: 'седьмое', l11: 'живые', l12: 'комментариях' };
+  CAPS = [];
+  for (const L0 of LINES) {
+    const txtl = L0.text, t0 = VO[L0.id], d = D[L0.id];
+    const parts = txtl.match(/[^,.:!?—]+[,.:!?—…]*\s*/g).reduce((acc, p) => { const last = acc[acc.length - 1]; if (last != null && (last + p).trim().length <= 38) acc[acc.length - 1] += p; else acc.push(p); return acc; }, []);
+    let c0 = 0; for (const p of parts) { const f0 = c0 / txtl.length, f1 = (c0 + p.trimEnd().length) / txtl.length; c0 += p.length; CAPS.push({ t0: t0 + f0 * d - .06, t1: t0 + f1 * d + .3, text: p.trim().replace(/\s*—$/, ''), key: KEYS[L0.id] }); }
+  }
+  for (let i = 0; i < CAPS.length - 1; i++) CAPS[i].t1 = Math.min(Math.max(CAPS[i].t1, CAPS[i].t0 + 1.2), CAPS[i + 1].t0 - .03);
+  CAPS.forEach(c => { c.el = captionBar(caps, c.text, c.key); op(c.el.g, 0); });
+  // dot wipes
+  const cell = 90, cols = Math.ceil(W / cell) + 1, rows = Math.ceil(H / cell) + 1, dots = el('g', {}, wipe), circ = [];
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) circ.push({ e: el('circle', { cx: i * cell, cy: j * cell, r: 0 }, dots), k: (i / cols + j / rows) * .5 });
+  wipeUpdate = t => {
+    let act = null; for (const w of WIPES) if (t > w[0] - .3 && t < w[0] + .3) act = w;
+    if (!act) { show(dots, false); return; } show(dots, true); dots.setAttribute('fill', act[1]);
+    for (const c of circ) { const u = (t - act[0]) / .3 + c.k * .6 - .3, a = u < 0 ? clamp(1 + u * 1.6) : clamp(1 - u * 1.6); c.e.setAttribute('r', (a * cell * .75).toFixed(1)); }
+  };
+}
+let hudUpdate = () => {}, wipeUpdate = () => {}, CAPS = [], LINES = [];
+
+// ───────────────────────────── paper & grain
+function buildPaper() {
+  const cv = document.getElementById('paper'), ctx = cv.getContext('2d'), r = rng(3);
+  const small = document.createElement('canvas'); small.width = 54; small.height = 96; const sctx = small.getContext('2d'), sim = sctx.createImageData(54, 96);
+  for (let i = 0; i < sim.data.length; i += 4) { const v = 242 + r() * 13; sim.data[i] = sim.data[i + 1] = sim.data[i + 2] = v; sim.data[i + 3] = 255; }
+  sctx.putImageData(sim, 0, 0); ctx.imageSmoothingEnabled = true; ctx.drawImage(small, 0, 0, W, H);
+  const base = ctx.getImageData(0, 0, W, H);
+  for (let i = 0; i < base.data.length; i += 4) { const n = (r() - .5) * 24; base.data[i] = clamp(base.data[i] + n, 0, 255); base.data[i + 1] = clamp(base.data[i + 1] + n, 0, 255); base.data[i + 2] = clamp(base.data[i + 2] + n - 4, 0, 255); }
+  ctx.putImageData(base, 0, 0);
+  const gr = ctx.createRadialGradient(540, 960, 500, 540, 960, 1250); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(120,100,80,0.35)'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(140,120,100,0.18)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 960); ctx.lineTo(W, 962); ctx.stroke();
+}
+function drawFx(frame) {
+  const cv = document.getElementById('fx'), ctx = cv.getContext('2d'); ctx.clearRect(0, 0, W, H);
+  const r = rng(1000 + Math.floor(frame / 2)); ctx.fillStyle = 'rgba(255,248,235,0.7)';
+  for (let i = 0; i < 520; i++) { ctx.beginPath(); ctx.arc(r() * W, r() * H, .6 + r() * 1.8, 0, 7); ctx.fill(); }
+  ctx.fillStyle = 'rgba(28,42,35,0.25)'; for (let i = 0; i < 90; i++) { ctx.beginPath(); ctx.arc(r() * W, r() * H, .6 + r() * 1.3, 0, 7); ctx.fill(); }
+}
+
+// ───────────────────────────── render
+const boilT = document.getElementById('boilT');
+function render(t) {
+  const frame = Math.round(t * FPS);
+  boilT.setAttribute('seed', 1 + (Math.floor(t * 10) % 40));
+  for (const s of scenes) { const on = t >= s.t0 && t < s.t1; show(s.g, on); if (on) s.update(t); }
+  let dx = 0, dy = 0;
+  for (const [t0, a, d] of SHAKES) if (t >= t0 && t < t0 + d) { const k = 1 - (t - t0) / d; dx += a * k * k * Math.sin(t * 91 + t0); dy += a * k * k * Math.cos(t * 77 + t0 * 3); }
+  const beat = 60 / 96, quiet = t >= TL.t7 && t < TL.tReveal, pulse = quiet ? 1 : 1 + .006 * Math.exp(-((t % beat) / .07));
+  cam.setAttribute('transform', `translate(${(dx + 540 * (1 - pulse)).toFixed(2)} ${(dy + 960 * (1 - pulse)).toFixed(2)}) scale(${pulse.toFixed(4)})`);
+  let fl = 0; for (const [f, a] of FLASH) if (t >= f && t < f + .25) fl = Math.max(fl, a * Math.pow(1 - (t - f) / .25, 2)); op(flash, fl);
+  for (const c of CAPS) { if (t >= c.t0 && t < c.t1) { const p = seg(t, c.t0, c.t0 + .3); op(c.el.g, seg(t, c.t0, c.t0 + .1) * (1 - seg(t, c.t1 - .1, c.t1))); tf(c.el.g, 540, 1790 + 30 * (1 - E.out(p)), lerp(.85, 1, E.back(p)), -1); } else op(c.el.g, 0); }
+  hudUpdate(t); wipeUpdate(t); drawFx(frame);
+}
+async function init() {
+  const tm = await (await fetch('vo-src/timing.json')).json(); LINES = await (await fetch('lines.json')).json();
+  VO = tm.VO; D = tm.D; DUR = tm.total;
+  const LN = Object.fromEntries(LINES.map(l => [l.id, l]));
+  AT = (id, w, k = 0) => { const s = (LN[id].say || LN[id].text).toLowerCase(); let i = -1; for (let n = 0; n <= k; n++) { i = s.indexOf(w.toLowerCase(), i + 1); if (i < 0) throw new Error(`"${w}" not in ${id}`); } return VO[id] + .03 + (D[id] - .1) * (i / s.length); };
+  const fams = ['900 50px Playfair', '900 50px Rubik', '800 50px Rubik', '800 50px JBMono', '400 50px Bagel', '700 50px Caveat'];
+  const sample = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя0123456789?!.,:—>/₂ ✓REC№-';
+  await Promise.all(fams.map(f => document.fonts.load(f, sample))); await document.fonts.ready;
+  buildPaper(); buildAll();
+  window.DUR = DUR;
+  window.EV = [{ t: 0, type: 'cues', VO, D, TL, SHAKES, WIPES: WIPES.map(w => w[0]), DUR }, ...CAPS.map(c => ({ t: +c.t0.toFixed(3), type: 'sub', t1: +c.t1.toFixed(3), text: c.text }))];
+  render(0); window.READY = true;
+}
+window.render = render;
+init();
+</script>
+</body>
+</html>
