@@ -1,0 +1,15 @@
+«Ловушка» (test) — third-party material in the film
+
+Picture
+- Woodcut engine (js/engine/*), rig helpers (js/rig.js) and the paper-peel transition (js/trans.js): from the
+  Lemo-Opuscar library, styles/woodcut/demo — https://github.com/lemomo-ai/lemo-opuscar — MIT License.
+  Adapted for a vertical frame (js/stage.js, js/trans.js).
+- Captions and carved titles: Old Standard TT (Alexey Kryukov), SIL Open Font License 1.1 —
+  https://github.com/google/fonts/tree/main/ofl/oldstandardtt (fonts/OFL-OldStandardTT.txt).
+- All plates, figures and motifs (js/film.js, js/figures.js): carved in code for this film.
+
+Sound
+- Narration: synthetic voice, Piper TTS (https://github.com/rhasspy/piper) with the voice model "ru irinia medium"
+  (release v0.0.2); its dataset comes from RHVoice (https://github.com/RHVoice/RHVoice), licence GPLv2.
+  Check the licence before publishing, or replace voice/<id>.wav with your own recording.
+- Score and all sound effects: synthesised in code (mix.py). No samples.
