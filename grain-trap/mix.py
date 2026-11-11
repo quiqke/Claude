@@ -89,7 +89,7 @@ for e in E:
     elif ty == 'magnet': put(fol, magnet(e.get('big', 0)), t, 1.1, -.05)
     elif ty == 'magnetOff': put(fol, magnet_off(), t, 1, .1); put(fol, slide(C['swap1'] - t), t + .1, 1, 0)
     elif ty == 'erase': put(fol, eraser(e['dur']), t, 1.1, .1)
-    elif ty == 'slam': put(fol, slam(), t, 1.6, 0)
+    elif ty == 'slam': put(fol, slam(), t, 1.1, 0)
     elif ty == 'capOn': put(fol, cap_on(), t, 1, .4)
 for t in (C['drop1'], C['drop2']): put(fol, whoosh(.3, .4), t - .3, 1, 0)
 by_pen = {}
@@ -135,7 +135,9 @@ mus = mus * (1 - (1 - db(-8)) * dk)[:, None]
 def rms(x): m = np.abs(x).max(1) > 1e-4; return float(np.sqrt(np.mean(x[m] ** 2))) if m.any() else 1.
 vr, mr, fr = rms(vo), rms(mus), rms(fol)
 mix = vo + mus * (vr / mr) * db(-9) + fol * (vr / fr) * db(-12) + room
-mix = np.stack([limit(mix[:, c], .95) for c in range(2)], 1)
+mix = np.stack([compress(mix[:, c], thr=.18, ratio=2.5, att=.003, rel=.12) for c in range(2)], 1)   # bus glue: tames TTS and slam peaks
+mix = mix / (np.abs(mix).max() + 1e-9) * .9 * db(6.3)                 # ≈ −14 LUFS; the limiter takes the short marker/magnet transients
+mix = np.stack([limit(limit(mix[:, c], .8), .8) for c in range(2)], 1)
 sf.write(os.path.join(HERE, 'mix.wav'), mix[:int(DUR * SR)].astype(np.float32), SR)
 st = os.path.join(HERE, 'out', 'stems'); os.makedirs(st, exist_ok=True)
 for name, x in [('vo', vo), ('music', mus * (vr / mr) * db(-9)), ('foley', fol * (vr / fr) * db(-12)), ('room', room)]:
