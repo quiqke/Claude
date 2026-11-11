@@ -36,7 +36,7 @@ export async function build() {
   const B = new W.Pen('blue', INK.blue, { park: [SW + 360, SH * .45] });
   const R = new W.Pen('red', RED, { park: [SW + 330, SH * .78] });
   const PENS = [K, B, R];
-  const T = W.text;
+  const T = (s, x, y, o = {}) => W.text(s, x, y, { spacing: .82, ...o });   // Hershey advances are wide: tighten
   const D = (pen, shapes, t0, t1, o = {}) => tl.draw(pen, shapes, t0, { by: t1, ...o });
 
   // ───────── drawing kit
@@ -113,6 +113,7 @@ export async function build() {
   const gw = ['ДЗ', 'x = 4', 'пн', '→ 12', 'тест', 'ок!', 'стр. 7', '2 + 2'];
   for (let i = 0; i < 70; i++) {
     const x = gR() * (BW - 400) + 200, y = gR() * (BH - 400) + 200, k = gR(), o = { w: 12, alpha: .03 + gR() * .035, color: gR() < .2 ? '#8aa0c8' : '#9aa0a8' };
+    if (Math.abs(x - 1100) < 1000 && y > 1700 && y < 2800) continue;   // keep the trap close-up clean
     if (k < .3) ghosts.push(...T(gw[i % gw.length], x, y, { h: 60 + gR() * 50, ...o }));
     else if (k < .55) ghosts.push(W.circle(x, y, 50 + gR() * 120, o));
     else if (k < .8) ghosts.push(...W.arrow(x, y, x + (gR() - .5) * 600, y + (gR() - .5) * 400, o));
@@ -443,12 +444,12 @@ export async function build() {
     const txt = L.text, t0 = VO[L.id], d = dur[L.id];
     const parts = txt.match(/[^,.:!?—]+[,.:!?—…]*\s*/g).reduce((acc, p) => {
       const last = acc[acc.length - 1];
-      if (last != null && ((last + p).trim().length <= 30 || p.trim().length < 9)) acc[acc.length - 1] += p; else acc.push(p); return acc;
+      if (last != null && ((last + p).trim().length <= 44 || p.trim().length < 12)) acc[acc.length - 1] += p; else acc.push(p); return acc;
     }, []);
     const pieces = [];
     for (const p of parts) {                         // chunks longer than ~34 chars are cut at words into even pieces
-      const s = p.trim(); if (s.length <= 34) { pieces.push(p); continue; }
-      const n = Math.ceil(s.length / 32), target = s.length / n; let cur = '';
+      const s = p.trim(); if (s.length <= 46) { pieces.push(p); continue; }
+      const n = Math.ceil(s.length / 40), target = s.length / n; let cur = '';
       for (const w of s.split(' ')) { if (cur && (cur + ' ' + w).length > target + 4) { pieces.push(cur + ' '); cur = w; } else cur = cur ? cur + ' ' + w : w; }
       pieces.push(cur + p.slice(p.trimEnd().length));
     }
@@ -457,6 +458,10 @@ export async function build() {
       const f0 = c0 / txt.length, f1 = (c0 + p.trimEnd().length) / txt.length; c0 += p.length;
       subs.push({ t0: t0 + f0 * d - .05, t1: t0 + f1 * d + .3, text: p.trim().replace(/\s*—$/, '').replace(/(\d) (\d)/g, '$1\u00a0$2') });
     }
+  }
+  for (let i = 0; i < subs.length - 1; i++) {        // a caption too short to read joins its neighbour in the same line
+    const a = subs[i], b = subs[i + 1];
+    if (b.t0 - a.t1 < .2 && (a.t1 - a.t0 < 1.6 || b.t1 - b.t0 < 1.6) && (a.text + ' ' + b.text).length <= 58) { a.text += ' ' + b.text; a.t1 = b.t1; subs.splice(i + 1, 1); i--; }
   }
   for (let i = 0; i < subs.length - 1; i++) subs[i].t1 = Math.min(Math.max(subs[i].t1, subs[i].t0 + 1.8), subs[i + 1].t0 - .04);
   window.__subs = subs;
