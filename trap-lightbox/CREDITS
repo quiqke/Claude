@@ -1,0 +1,15 @@
+«Ловушка» (test) — third-party material in the film
+
+Picture
+- Paper-cut lightbox engine (js/paper.js, js/stage.js, js/post.js, js/lib.js): from the Lemo-Opuscar library,
+  styles/paper-lantern/demo — https://github.com/lemomo-ai/lemo-opuscar — MIT License. Adapted for a vertical frame.
+- three.js (MIT), via the library's node_modules.
+- Paper text and subtitles: Cormorant Garamond, SIL Open Font License 1.1 —
+  https://github.com/google/fonts/tree/main/ofl/cormorantgaramond (fonts/OFL-CormorantGaramond.txt).
+- All scenes, figures and motifs (js/shots.js, js/motifs.js): drawn in code for this film.
+
+Sound
+- Narration: synthetic voice, Piper TTS (https://github.com/rhasspy/piper) with the voice model "ru irinia medium"
+  (release v0.0.2); its dataset comes from RHVoice (https://github.com/RHVoice/RHVoice), licence GPLv2.
+  A placeholder for the test: check the licence before publishing, or replace voice/<id>.wav with your own recording.
+- Score and all sound effects: synthesised in code (mix.py). No samples.
