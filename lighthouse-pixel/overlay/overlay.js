@@ -52,21 +52,22 @@ export async function createOverlay(cv, cues, o = {}) {
     const C = th.cap, s = C.size * k, font = F(C.font, s), lh = s * (C.lh || 1.25), a = Math.min(seg(t, p.t0, p.t0 + .12), 1 - seg(t, p.t1 - .12, p.t1));
     if (a <= 0) return;
     const rows = wrap(p.words, font); g.font = font; const sp = g.measureText(' ').width;
-    const gap = w => sp + g.measureText(w.w).width * .07;   // room for the lit word to grow
-    const rw = rows.map(([i, j]) => p.words.slice(i, j).reduce((acc, w, k) => acc + g.measureText(w.w).width + (k ? gap(w) : 0), 0));
+    const gap = (w, nx) => sp + (g.measureText(w.w).width + (nx ? g.measureText(nx.w).width : 0)) * .04;   // room for the lit word to grow
+    const rw = rows.map(([i, j]) => p.words.slice(i, j).reduce((acc, w, k) => acc + g.measureText(w.w).width + (k ? gap(p.words[i + k - 1], w) : 0), 0));
     const bw = Math.max(...rw), bh = lh * rows.length, pop = back(seg(t, p.t0, p.t0 + .28));
     g.save(); g.globalAlpha = a; g.translate(W / 2, capY); g.scale(.85 + .15 * pop, .85 + .15 * pop); g.translate(-W / 2, -capY);
     if (C.box) { const pd = (C.box.pad || 20) * k; box(W / 2 - bw / 2 - pd, capY - bh / 2 - pd * .8, bw + pd * 2, bh + pd * 1.6, C.box); }
     g.textBaseline = 'middle'; g.textAlign = 'left'; g.lineJoin = 'round';
     rows.forEach(([i, j], r) => {
       let x = W / 2 - rw[r] / 2; const y = capY - bh / 2 + lh * (r + .5);
-      for (const w of p.words.slice(i, j)) {
+      const row = p.words.slice(i, j);
+      for (let q = 0; q < row.length; q++) { const w = row[q];
         const ww = g.measureText(w.w).width, said = t >= w.t0, now = t >= w.t0 && t < w.t1, cc = colOf(w);
         const fill = now ? (cc || th.col.now) : said ? (cc || C.fill) : C.fill, sc = now ? 1.1 : 1;
         g.save(); g.translate(x + ww / 2, y); g.scale(sc, sc); g.globalAlpha = a * (said ? 1 : C.dim);
         if (C.stroke) { g.strokeStyle = C.stroke; g.lineWidth = C.sw * k; g.strokeText(w.w, -ww / 2, 0); }
         g.fillStyle = fill; g.fillText(w.w, -ww / 2, 0); g.restore();
-        x += ww + gap(w);
+        x += ww + gap(w, row[q + 1]);
       }
     });
     g.restore();

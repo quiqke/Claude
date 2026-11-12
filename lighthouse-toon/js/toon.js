@@ -4,6 +4,24 @@ export const INK = '#231629';
 const hash = (a, b = 0, c = 0) => { let h = (a * 374761393 + b * 668265263 + c * 2147483647) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 export let BOIL = 0;                                    // boil drawing index (3 drawings at 12 fps)
 export function setTime(t) { BOIL = Math.floor(t * 12) % 3; }
+// camera: world point (x, y) → screen; zoom changes positions only, line weight stays constant (screen-space strokes)
+export const CAM = { x: 960, y: 540, z: 1, sx: 0, sy: 0 };
+export function setCam(x = 960, y = 540, z = 1, sx = 0, sy = 0) { CAM.x = x; CAM.y = y; CAM.z = z; CAM.sx = sx; CAM.sy = sy; }
+export const ROT = { a: 0, x: 0, y: 0 };
+export function setRot(a = 0, x = 0, y = 0) { ROT.a = a; ROT.x = x; ROT.y = y; }   // rotate following drawing around (x, y) — e.g. a person lying down
+export const P = ([x, y]) => {
+  if (ROT.a) { const c = Math.cos(ROT.a), s = Math.sin(ROT.a), dx = x - ROT.x, dy = y - ROT.y; x = ROT.x + dx * c - dy * s; y = ROT.y + dx * s + dy * c; }
+  return [(x - CAM.x) * CAM.z + 960 + CAM.sx, (y - CAM.y) * CAM.z + 540 + CAM.sy];
+};
+export function dot(g, x, y, r, col = INK) { const [X, Y] = P([x, y]); g.fillStyle = col; g.beginPath(); g.arc(X, Y, Math.max(1.5, r * CAM.z), 0, 7); g.fill(); }
+// cartoon lettering: heavy rounded sans with a thick ink outline (comic sound words, labels, warnings)
+export function text(g, s, x, y, size, fill = '#fff', o = {}) {
+  const [X, Y] = P([x, y]), sz = size * (o.fixed ? 1 : CAM.z);
+  g.save(); g.translate(X, Y); if (o.rot) g.rotate(o.rot); g.font = `${o.weight || 900} ${Math.round(sz)}px ${o.font || 'Rubik'}`; g.textAlign = o.align || 'center'; g.textBaseline = 'middle';
+  if (o.reveal != null) { const w = g.measureText(s).width; g.beginPath(); g.rect(-w / 2 - 20, -sz, (w + 40) * o.reveal, sz * 2); g.clip(); }
+  if (o.outline !== false) { g.lineJoin = 'round'; g.lineWidth = o.lw ?? Math.max(6, sz * .16); g.strokeStyle = o.outline || INK; g.strokeText(s, 0, 0); }
+  g.fillStyle = fill; g.fillText(s, 0, 0); g.restore();
+}
 // resample a polyline (closed) every ~step px and push points along the normal with smooth noise → hand-drawn boil
 function boil(pts, closed = true, amp = 1.7, step = 9, seed = 1) {
   const out = [], n = pts.length; if (n < 2) return pts;
@@ -22,16 +40,18 @@ function boil(pts, closed = true, amp = 1.7, step = 9, seed = 1) {
 function path(g, pts, closed = true) {
   g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); if (closed) g.closePath();
 }
+const scr = pts => pts.map(P);
 // main primitive: fill + optional hard shadow (the same shape offset away from the light, clipped inside) + boiling outline
 export function shape(g, pts, o = {}) {
-  const seed = o.seed ?? (pts.length * 7 + Math.round(pts[0][0] + pts[0][1])), bp = o.boil === false ? pts : boil(pts, o.closed !== false, o.amp ?? 1.7, 9, seed);
+  const seed = o.seed ?? (pts.length * 7 + Math.round(pts[0][0] + pts[0][1])); pts = scr(pts);
+  const bp = o.boil === false ? pts : boil(pts, o.closed !== false, o.amp ?? 1.7, 9, seed);
   if (o.fill && o.closed !== false) { g.fillStyle = o.fill; path(g, bp); g.fill(); }
   if (o.shade && o.closed !== false) {
-    g.save(); path(g, bp); g.clip(); g.fillStyle = o.shade; const [dx, dy] = o.shadeOff || [18, 14];
+    g.save(); path(g, bp); g.clip(); g.fillStyle = o.shade; const [dx, dy] = (o.shadeOff || [18, 14]).map(v => v * CAM.z);
     path(g, bp.map(([x, y]) => [x - dx, y - dy])); g.rect(-5000, -5000, 12000, 12000); g.fill('evenodd'); g.restore();
   }
   if (o.hi && o.closed !== false) {                    // a flat highlight sliver on the lit side
-    g.save(); path(g, bp); g.clip(); g.fillStyle = o.hi; const [dx, dy] = o.hiOff || [-8, -8];
+    g.save(); path(g, bp); g.clip(); g.fillStyle = o.hi; const [dx, dy] = (o.hiOff || [-8, -8]).map(v => v * CAM.z);
     path(g, bp.map(([x, y]) => [x - dx, y - dy])); g.rect(-5000, -5000, 12000, 12000); g.fill('evenodd'); g.restore();
   }
   if (o.line !== false) { g.lineJoin = 'round'; g.lineCap = 'round'; g.strokeStyle = o.line || INK; g.lineWidth = o.lw ?? 7; path(g, bp, o.closed !== false); g.stroke(); }
@@ -41,8 +61,20 @@ export const rect = (x, y, w, h) => [[x, y], [x + w, y], [x + w, y + h], [x, y +
 export function rrect(x, y, w, h, r) { const p = []; for (const [cx, cy, a] of [[x + w - r, y + r, -Math.PI / 2], [x + w - r, y + h - r, 0], [x + r, y + h - r, Math.PI / 2], [x + r, y + r, Math.PI]]) for (let i = 0; i <= 6; i++) { const t = a + i / 6 * Math.PI / 2; p.push([cx + Math.cos(t) * r, cy + Math.sin(t) * r]); } return p; }
 export const xf = (pts, tx, ty, s = 1, rot = 0) => pts.map(([x, y]) => [tx + (x * Math.cos(rot) - y * Math.sin(rot)) * s, ty + (x * Math.sin(rot) + y * Math.cos(rot)) * s]);
 export function line(g, pts, o = {}) { shape(g, pts, { ...o, closed: false, fill: null }); }
-export function bands(g, W, ys, cols) { for (let i = 0; i < cols.length; i++) { g.fillStyle = cols[i]; g.fillRect(0, ys[i], W, (ys[i + 1] ?? 4000) - ys[i]); } }
-export function glowRings(g, x, y, r, col, a = .25) { g.save(); g.globalAlpha = a; g.fillStyle = col; for (const k of [1, .7]) { g.beginPath(); g.arc(x, y, r * k, 0, 7); g.fill(); } g.restore(); }
+export function bands(g, W, ys, cols) { for (let i = 0; i < cols.length; i++) { const y0 = ys[i] <= 0 ? -10 : P([0, ys[i]])[1], y1 = i + 1 < cols.length ? P([0, ys[i + 1]])[1] : 4000; g.fillStyle = cols[i]; g.fillRect(0, y0, 1920, y1 - y0); } }
+export function glowRings(g, x, y, r, col, a = .25) { const [X, Y] = P([x, y]); g.save(); g.globalAlpha = a; g.fillStyle = col; for (const k of [1, .7]) { g.beginPath(); g.arc(X, Y, r * k * CAM.z, 0, 7); g.fill(); } g.restore(); }
+// darkness with holes of light (flashlight, lamp): screen-space overlay
+let DK = null;
+export function dark(g, a, holes = [], col = '#0b0b24') {          // soft-edged light pools in a dark overlay
+  if (!DK) { const c = document.createElement('canvas'); c.width = 1920; c.height = 1080; DK = c.getContext('2d'); }
+  DK.globalCompositeOperation = 'source-over'; DK.clearRect(0, 0, 1920, 1080); DK.globalAlpha = a; DK.fillStyle = col; DK.fillRect(0, 0, 1920, 1080);
+  DK.globalAlpha = 1; DK.globalCompositeOperation = 'destination-out';
+  for (const h of holes) { const [X, Y] = P([h.x, h.y]), R = h.r * CAM.z, sy = h.sy || 1; DK.save(); DK.translate(X, Y); DK.scale(1, sy);
+    const gr = DK.createRadialGradient(0, 0, R * .25, 0, 0, R * 1.15); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(.6, 'rgba(0,0,0,.75)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    DK.fillStyle = gr; DK.beginPath(); DK.arc(0, 0, R * 1.15, 0, 7); DK.fill(); DK.restore(); }
+  g.drawImage(DK.canvas, 0, 0);
+}
+export function tint(g, col, a) { g.save(); g.globalAlpha = a; g.fillStyle = col; g.fillRect(0, 0, 1920, 1080); g.restore(); }
 
 // ═════ people ═════
 export const CAST = {
@@ -74,7 +106,7 @@ export function face(g, cx, cy, R, c, f = {}) {
     if (eyes === 'closed') { line(g, ell(x, ey, rx, er * .5, 10, Math.PI * .1, Math.PI * .9), { lw: 6 }); continue; }
     const ry = er * (eyes === 'wide' ? 1.25 : eyes === 'half' ? .65 : 1.05);
     shape(g, ell(x, ey, rx, ry, 22), { fill: '#ffffff', lw: 6 });
-    const pr = eyes === 'wide' ? R * .05 : R * .065; g.fillStyle = INK; g.beginPath(); g.arc(x + lx * rx * .5 + side * rx * .25, ey + ly * ry * .5, pr, 0, 7); g.fill();
+    const pr = eyes === 'wide' ? R * .05 : R * .065; dot(g, x + lx * rx * .5 + side * rx * .25, ey + ly * ry * .5, pr);
     if (eyes === 'half') shape(g, [...ell(x, ey, rx + 2, ry + 2, 14, Math.PI, Math.PI * 2), [x + rx, ey - ry * .1], [x - rx, ey - ry * .1]], { fill: c.skinS, lw: 6 });
     // brows
     const bw = rx * .9, by = ey - ry - R * .12, br = f.brow || 'neutral';
@@ -88,7 +120,7 @@ export function face(g, cx, cy, R, c, f = {}) {
   if (mo < .08) line(g, [[cx + sx - mw, my - sm * R * .1], [cx + sx, my + sm * R * .08], [cx + sx + mw, my - sm * R * .1]], { lw: 6 });
   else {
     const h = R * (.08 + .35 * mo), pts = [...ell(cx + sx, my, mw, h, 20, 0, Math.PI), [cx + sx - mw, my - sm * R * .06], [cx + sx + mw, my - sm * R * .06]];
-    shape(g, pts, { fill: '#7a1f2b', lw: 6 }); if (mo > .3) { g.save(); path(g, pts); g.clip(); g.fillStyle = '#e8606a'; g.beginPath(); g.ellipse(cx + sx, my + h * .9, mw * .6, h * .45, 0, 0, 7); g.fill(); g.restore(); }
+    shape(g, pts, { fill: '#7a1f2b', lw: 6 }); if (mo > .3) shape(g, ell(cx + sx, my + h * .75, mw * .5, h * .3, 14), { fill: '#e8606a', line: false });
   }
   if (f.sweat) { shape(g, [[cx + R * .95, cy - R * .5], [cx + R * 1.08, cy - R * .2], [cx + R * .95, cy - R * .12], [cx + R * .84, cy - R * .22]], { fill: '#bfe8ff', lw: 4 }); }
   if (f.tear) shape(g, [[cx + sx + ex, ey + er * 1.2], [cx + sx + ex + R * .08, ey + er * 1.7], [cx + sx + ex, ey + er * 1.85], [cx + sx + ex - R * .08, ey + er * 1.7]], { fill: '#7fd0ff', lw: 4 });
@@ -128,7 +160,7 @@ export function person(g, who, x, fy, s, p = {}) {
   shape(g, T_torso(x + lx, shY, tw, hipY + H * .1, x), { fill: c.coat, shade: c.coatS, shadeOff: [-d * H * .06, 0] });
   shape(g, [[x + lx - tw * .55, shY - H * .01], [x + lx, shY + H * .09], [x + lx + tw * .55, shY - H * .01], [x + lx + tw * .3, shY - H * .05], [x + lx - tw * .3, shY - H * .05]], { fill: c.coatS, lw: 6 });   // collar
   line(g, [[x + lean * H * .1 + d * 4, shY + H * .03], [x + d * 4, hipY + H * .1]], { lw: 5 });                // coat seam
-  for (const k of [.3, .55, .8]) { g.fillStyle = INK; g.beginPath(); g.arc(x + d * 14, shY + (hipY + H * .1 - shY) * k, 5, 0, 7); g.fill(); }
+  for (const k of [.3, .55, .8]) dot(g, x + d * H * .03, shY + (hipY + H * .1 - shY) * k, H * .01);
   const hand = arm(p.armF ?? -.1, true);
   face(g, x + lean * H * .25 + d * H * .01, shY - R * .95, R, c, { side: p.face?.side ?? d * .7, ...p.face });
   return { hand, head: [x + lean * H * .25, shY - R * .95], R };
