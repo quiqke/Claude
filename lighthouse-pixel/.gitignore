@@ -1,0 +1,5 @@
+voice/*.wav
+music.wav
+mix.wav
+out/
+*.mp4
