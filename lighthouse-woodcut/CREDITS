@@ -1,0 +1,5 @@
+«11 правил маяка» — test (Woodcut Print), third-party material
+- Woodcut engine (js/engine/*), rig (js/rig.js), paper peel (js/trans.js): Lemo-Opuscar, styles/woodcut/demo — MIT. Stage adapted (js/stage.js).
+- Old Standard TT (OFL 1.1), fonts/OFL-OldStandardTT.txt.
+- Narration: Piper TTS, voice "ru irinia medium" (v0.0.2), dataset RHVoice (GPLv2) — placeholder; replace voice/<id>.wav with the final narration.
+- Plates, figures, score and sound effects: made in code for this film (js/film.js, mix.py).
