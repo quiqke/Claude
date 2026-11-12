@@ -4,9 +4,10 @@
 <script type="module">
 import { createOverlay } from './overlay/overlay.js';
 const cues = await (await fetch('./cues.json')).json();
-const film = await import('./js/film.js');                       // export async function init(canvas, cues) → { draw(t) }
-const st = await film.init(document.getElementById('stage'), cues);
-const ov = await createOverlay(document.getElementById('ov'), cues, { theme: cues.theme, base: './overlay/' });
+const q = new URLSearchParams(location.search), thumb = q.get('thumb');   // ?thumb=A|B|C → YouTube thumbnail instead of the film
+const film = await import(thumb ? './js/thumb.js' : './js/film.js');      // export async function init(canvas, cues) → { draw(t) }
+const st = await film.init(document.getElementById('stage'), cues, thumb);
+const ov = thumb ? { draw() {} } : await createOverlay(document.getElementById('ov'), cues, { theme: cues.theme, base: './overlay/' });
 window.DUR = cues.total; window.EV = st.EV || [];
 window.render = t => { st.draw(t); ov.draw(t); };
 window.READY = true;

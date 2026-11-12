@@ -1,0 +1,74 @@
+// thumb.js — YouTube thumbnails for «11 правил маяка» (1920×1080, scaled to 1280×720): huge scared face, 2–3 giant words, a red arrow at the threat.
+import * as T from './toon.js';
+import * as S from './world.js';
+const { shape, line, ell, rect, rrect, face, dot, text, glowRings, INK } = T;
+let g, V;
+export async function init(cv, cues, v) {
+  g = cv.getContext('2d'); V = v || 'A';
+  for (const [n, u] of [['Rubik', 'Rubik.ttf'], ['Caveat', 'Caveat.ttf'], ['JBMono', 'JetBrainsMono.ttf']]) { try { const f = new FontFace(n, `url(./overlay/fonts/${u})`); await f.load(); document.fonts.add(f); } catch (e) {} }
+  return { draw, EV: [] };
+}
+// giant thumbnail word: heavy, thick double outline (ink + white rim), slight tilt, optional gradient
+function big(s, x, y, size, fill, o = {}) {
+  g.save(); g.translate(x, y); g.rotate(o.rot || 0); g.font = `900 ${size}px Rubik`; g.textAlign = o.align || 'left'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+  g.lineWidth = size * .34; g.strokeStyle = INK; g.strokeText(s, 0, 0);
+  g.lineWidth = size * .12; g.strokeStyle = o.rim || '#ffffff'; g.strokeText(s, 0, 0);
+  if (Array.isArray(fill)) { const gr = g.createLinearGradient(0, -size / 2, 0, size / 2); fill.forEach((c, i) => gr.addColorStop(i / (fill.length - 1), c)); g.fillStyle = gr; } else g.fillStyle = fill;
+  g.fillText(s, 0, 0); g.restore();
+}
+function arrow(x0, y0, x1, y1, w = 46) {          // fat red arrow with ink outline
+  const a = Math.atan2(y1 - y0, x1 - x0), L = Math.hypot(x1 - x0, y1 - y0), hl = w * 2.2;
+  const pts = [[0, -w / 2], [L - hl, -w / 2], [L - hl, -w * 1.25], [L, 0], [L - hl, w * 1.25], [L - hl, w / 2], [0, w / 2]].map(([u, v]) => [x0 + u * Math.cos(a) - v * Math.sin(a), y0 + u * Math.sin(a) + v * Math.cos(a)]);
+  shape(g, pts, { fill: '#ff2a2a', shade: '#c01818', shadeOff: [0, -10], lw: 12 });
+}
+function ring(x, y, rx, ry) { line(g, ell(x, y, rx, ry, 40, 0, Math.PI * 2.15), { line: '#ff2a2a', lw: 22, amp: 3 }); line(g, ell(x, y, rx, ry, 40, 0, Math.PI * 2.15), { line: INK, lw: 6, amp: 3 }); }
+function burst(x, y, r, col) { const p = []; for (let i = 0; i < 28; i++) { const a = i / 28 * Math.PI * 2, rr = i % 2 ? r : r * .62; p.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr]); } shape(g, p, { fill: col, lw: 10 }); }
+function heroFace(x, y, R, f) {                   // big scared face with raincoat collar
+  shape(g, [[x - R * 1.5, 1300], [x - R * 1.15, y + R * 1.05], [x + R * 1.15, y + R * 1.05], [x + R * 1.5, 1300]], { fill: '#ffc928', shade: '#e09a12', shadeOff: [R * .25, 0] });
+  shape(g, [[x - R * .7, y + R * .95], [x, y + R * 1.45], [x + R * .7, y + R * .95], [x + R * .4, y + R * .8], [x - R * .4, y + R * .8]], { fill: '#e09a12', lw: 8 });
+  face(g, x, y, R, T.CAST.hero, f);
+}
+function creep(x, y, R) {                        // the thing in the fog: long pale face, black hollow eyes, a black slot of a mouth
+  glowRings(g, x, y, R * 2.2, '#cfd2ff', .18);
+  shape(g, ell(x, y, R * .82, R * 1.15, 36), { fill: '#e9e6f3', shade: '#b9b4d6', shadeOff: [R * .2, R * .1] });
+  for (const d of [-1, 1]) { shape(g, ell(x + d * R * .33, y - R * .15, R * .22, R * .3, 18), { fill: '#120a1e', lw: 6 }); dot(g, x + d * R * .33 - R * .05, y - R * .2, R * .045, '#ffffff'); }
+  shape(g, ell(x, y + R * .55, R * .16, R * .36, 18), { fill: '#120a1e', lw: 6 });
+}
+const vignette = (a = .55) => { const gr = g.createRadialGradient(960, 540, 300, 960, 540, 1150); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, `rgba(5,0,20,${a})`); g.fillStyle = gr; g.fillRect(0, 0, 1920, 1080); };
+
+const VAR = {
+  // A — the 118th step: a pale face below the stairs, the counter in red
+  A() {
+    T.setCam(1150, 470, 1); S.stairs(g, 0, { step: 117, warm: true, hero: false, torch: false, dark: false });
+    T.setCam(); T.tint(g, '#140a30', .35);
+    glowRings(g, 1350, 700, 420, '#ff6a2a', .28);
+    creep(1560, 800, 170);
+    ring(1560, 800, 230, 260);
+    big('118', 1160, 560, 260, ['#ffef5a', '#ff5a2a'], { rot: -.08, align: 'center' });
+    vignette(.6);
+    heroFace(430, 600, 300, { eyes: 'wide', brow: 'up', scream: 1, sweat: true, look: [1, .7], side: .55 });
+    big('НЕ СПУСКАЙСЯ', 70, 150, 150, ['#ffffff', '#ffe14a'], { rot: -.03 });
+    arrow(1820, 260, 1680, 540, 50);
+  },
+  // B — the light: the beam on, dozens of things crawling up the tower
+  B() {
+    T.setCam(1330, 420, 1.45); S.ext(g, 2.3, { mode: 'night', lamp: 1, beam: 1, creatures: 26, fall: 0, fogTop: 760, fogDens: .9 });
+    T.setCam(); vignette(.55);
+    heroFace(400, 640, 300, { eyes: 'wide', brow: 'up', scream: 1, sweat: true, look: [1, -.6], side: .55 });
+    big('НЕ ВКЛЮЧАЙ', 70, 140, 150, ['#ffffff', '#ffe14a'], { rot: -.03 });
+    big('СВЕТ!', 120, 320, 190, ['#ff8a5a', '#ff2a2a'], { rot: -.03 });
+    ring(1340, 560, 250, 330); arrow(820, 420, 1110, 520, 46);
+  },
+  // C — the door: three knocks in the night and a voice that is not mum
+  C() {
+    T.setCam(2520, 470, 1.25); S.room(g, 0, { light: 'cold', fire: 0, lamp: 0, underDoor: 1, chars: [], holes: [{ x: 2520, y: 600, r: 520 }] });
+    T.setCam();
+    text(g, 'ТУК!', 1420, 230, 150, '#ffe14a', { fixed: true, rot: -.15, lw: 28 }); text(g, 'ТУК!', 1700, 420, 120, '#ffe14a', { fixed: true, rot: .1, lw: 24 }); text(g, 'ТУК!', 1460, 600, 100, '#ffe14a', { fixed: true, rot: -.05, lw: 20 });
+    for (let k = 0; k < 7; k++) { const x = 1250 + (k * 97) % 500, y = 760 + (k * 53) % 120; g.save(); g.globalAlpha = .9; shape(g, ell(x, y, 30, 36, 16), { fill: '#f4f0ff', line: false, seed: k }); for (let f = 0; f < 4; f++) shape(g, ell(x - 22 + f * 15, y - 50 + (f % 3 ? 0 : 10), 7, 19, 10), { fill: '#f4f0ff', line: false, seed: k * 5 + f }); g.restore(); }
+    vignette(.6);
+    heroFace(430, 610, 300, { eyes: 'wide', brow: 'worried', scream: .7, tear: true, sweat: true, look: [1, 0], side: .55 });
+    big('ЭТО НЕ', 80, 150, 170, ['#ffffff', '#ffe14a'], { rot: -.04 });
+    big('МАМА', 120, 330, 210, ['#ff8a5a', '#ff2a2a'], { rot: -.04 });
+  },
+};
+function draw() { T.setTime(0); T.setCam(); g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#000'; g.fillRect(0, 0, 1920, 1080); VAR[V](); T.setCam(); }

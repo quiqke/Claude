@@ -117,7 +117,11 @@ export function face(g, cx, cy, R, c, f = {}) {
   line(g, [[cx + sx + R * .05, cy + R * .2], [cx + sx + R * .14 * (side || 1), cy + R * .38], [cx + sx - R * .02, cy + R * .42]], { lw: 5 });
   // mouth: open amount, smile curl
   const mo = Math.max(0, Math.min(1, f.mouth || 0)), sm = f.smile || 0, my = cy + R * .62, mw = R * (.3 + .1 * mo);
-  if (mo < .08) line(g, [[cx + sx - mw, my - sm * R * .1], [cx + sx, my + sm * R * .08], [cx + sx + mw, my - sm * R * .1]], { lw: 6 });
+  if (f.scream) {                                       // terror: a tall dark O, teeth on top
+    const h = R * .36 * (f.scream || 1), w = R * .24, pts = ell(cx + sx, my + R * .05, w, h, 24);
+    shape(g, pts, { fill: '#5a1020', lw: 7 }); shape(g, ell(cx + sx, my + R * .05 + h * .55, w * .62, h * .32, 14), { fill: '#e8606a', line: false });
+    shape(g, [[cx + sx - w * .7, my - h * .78], [cx + sx + w * .7, my - h * .78], [cx + sx + w * .6, my - h * .55], [cx + sx - w * .6, my - h * .55]], { fill: '#ffffff', lw: 4 });
+  } else if (mo < .08) line(g, [[cx + sx - mw, my - sm * R * .1], [cx + sx, my + sm * R * .08], [cx + sx + mw, my - sm * R * .1]], { lw: 6 });
   else {
     const h = R * (.08 + .35 * mo), pts = [...ell(cx + sx, my, mw, h, 20, 0, Math.PI), [cx + sx - mw, my - sm * R * .06], [cx + sx + mw, my - sm * R * .06]];
     shape(g, pts, { fill: '#7a1f2b', lw: 6 }); if (mo > .3) shape(g, ell(cx + sx, my + h * .75, mw * .5, h * .3, 14), { fill: '#e8606a', line: false });
