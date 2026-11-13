@@ -37,6 +37,24 @@ function creep(x, y, R) {                        // the thing in the fog: long p
 const vignette = (a = .55) => { const gr = g.createRadialGradient(960, 540, 300, 960, 540, 1150); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, `rgba(5,0,20,${a})`); g.fillStyle = gr; g.fillRect(0, 0, 1920, 1080); };
 
 const VAR = {
+  // D — BIG: one giant face, one giant number, two giant words (reads on a phone at thumbnail size)
+  D() {
+    T.setCam(1150, 470, 1); S.stairs(g, 0, { step: 117, warm: true, hero: false, torch: false, dark: false });
+    T.setCam(); T.tint(g, '#12062a', .45); glowRings(g, 1450, 620, 700, '#ff5a1a', .35);
+    big('118', 1440, 610, 520, ['#fff26a', '#ffb02a', '#ff3a1a'], { rot: -.07, align: 'center' });
+    creep(1690, 900, 120); ring(1690, 900, 170, 190);
+    vignette(.55);
+    heroFace(450, 730, 330, { eyes: 'wide', brow: 'up', scream: 1.1, sweat: true, look: [1, .6], side: .5 });
+    big('НЕ СПУСКАЙСЯ!', 960, 125, 170, ['#ffffff', '#ffe14a'], { rot: -.02, align: 'center' });
+  },
+  // E — BIG: the door, the word, the face
+  E() {
+    T.setCam(2520, 470, 1.4); S.room(g, 0, { light: 'cold', fire: 0, lamp: 0, underDoor: 1, chars: [], holes: [{ x: 2520, y: 600, r: 520 }] });
+    T.setCam(); text(g, 'ТУК!', 1380, 330, 230, '#ffe14a', { fixed: true, rot: -.15, lw: 34 }); text(g, 'ТУК!', 1700, 620, 190, '#ffe14a', { fixed: true, rot: .12, lw: 30 });
+    vignette(.6);
+    heroFace(450, 730, 330, { eyes: 'wide', brow: 'worried', scream: .8, tear: true, sweat: true, look: [1, 0], side: .5 });
+    big('НЕ ОТКРЫВАЙ!', 960, 125, 165, ['#ff9a6a', '#ff2a2a'], { rot: -.02, align: 'center' });
+  },
   // A — the 118th step: a pale face below the stairs, the counter in red
   A() {
     T.setCam(1150, 470, 1); S.stairs(g, 0, { step: 117, warm: true, hero: false, torch: false, dark: false });
