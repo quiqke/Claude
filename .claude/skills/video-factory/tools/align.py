@@ -2,7 +2,8 @@
 
 usage: python align.py <project_dir> [--gap 0.5]
 Reads lines.json and every voice/part*.wav in natural order (part1, part2, part2b, part3 …; any rate, mono or stereo).
-1. Joins the parts with --gap seconds of silence → voice/narration.wav (48 kHz mono).
+1. Tightens each part (pauses > --max-pause 0.45 s shortened, tempo --speed 1.12 with pitch kept), joins them with
+   --gap seconds of silence → voice/narration.wav (48 kHz mono). Use --speed 1 --max-pause 0 to keep the take as recorded.
 2. Recognises the speech (sherpa-onnx + Vosk zipformer-ru, Apache-2.0, offline; ~20× faster than real time on CPU)
    in ≤ 18 s chunks cut at pauses, with a time for every recognised word.
 3. Aligns the script's words to the recognised words (Needleman–Wunsch on normalised words, fuzzy matching), so every
@@ -12,7 +13,9 @@ blocks with no voice («MISSING» — a part was cut off or skipped; voice that 
 where few words matched («CHECK»). Falls back to align_pauses.py if sherpa-onnx or the model is not installed.
 Setup: uv pip install --python $LIB/.venv/bin/python sherpa-onnx; model: tools/fetch_asr.sh"""
 import os, re, sys, json, argparse, subprocess, numpy as np, soundfile as sf
-ap = argparse.ArgumentParser(); ap.add_argument('project'); ap.add_argument('--gap', type=float, default=.5); a = ap.parse_args()
+ap = argparse.ArgumentParser(); ap.add_argument('project'); ap.add_argument('--gap', type=float, default=.35)
+ap.add_argument('--speed', type=float, default=1.12, help='tempo of the voice (pitch kept); 1 = as recorded')
+ap.add_argument('--max-pause', type=float, default=.45, help='longer silences are shortened to this'); a = ap.parse_args()
 HERE = os.path.dirname(os.path.abspath(__file__)); MODEL = os.environ.get('ASR_MODEL', '/root/opt/asr/sherpa-onnx-zipformer-ru-2024-09-18')
 try:
     import sherpa_onnx, soxr
@@ -25,6 +28,30 @@ nat = lambda s: [int(x) if x.isdigit() else x for x in re.split(r'(\d+)', s)]
 files = sorted([f for f in os.listdir(V) if re.match(r'part\d+[a-z]?\.wav$', f)], key=nat)
 if not files: sys.exit('no voice/part*.wav')
 
+FF = os.environ.get('FFMPEG') or ('/root/opt/bin/ffmpeg' if os.path.exists('/root/opt/bin/ffmpeg') else 'ffmpeg')
+def tighten(x, sr):
+    """shorten every pause longer than --max-pause (20 ms crossfades), then speed up the voice with ffmpeg atempo (pitch kept)"""
+    if a.max_pause > 0:
+        hop = int(.01 * sr); n = len(x) // hop; e = np.sqrt((x[:n * hop].reshape(n, hop) ** 2).mean(1)); sil = e < max(e.max() * .02, np.percentile(e, 20) * 1.5)
+        keep, i, cf = [], 0, int(.02 * sr); last = 0
+        while i < n:
+            if sil[i]:
+                j = i
+                while j < n and sil[j]: j += 1
+                if (j - i) / 100 > a.max_pause and i > 0 and j < n:
+                    cut0 = (i + int(a.max_pause * 50)) * hop; cut1 = (j - int(a.max_pause * 50)) * hop
+                    keep.append(x[last:cut0 + cf].copy()); last = cut1
+                i = j
+            else: i += 1
+        keep.append(x[last:])
+        y = keep[0]
+        for seg_ in keep[1:]:
+            r = np.linspace(1, 0, cf, dtype=np.float32); y[-cf:] = y[-cf:] * r + seg_[:cf] * (1 - r); y = np.concatenate([y, seg_[cf:]])
+        x = y
+    if abs(a.speed - 1) > .005:
+        import tempfile; d = tempfile.mkdtemp(); fi, fo = os.path.join(d, 'i.wav'), os.path.join(d, 'o.wav'); sf.write(fi, x, sr)
+        subprocess.run([FF, '-v', 'error', '-y', '-i', fi, '-filter:a', f'atempo={a.speed}', fo], check=True); x, _ = sf.read(fo); x = x.astype(np.float32)
+    return x
 def load(path, sr_out):
     y, sr = sf.read(path); y = (y if y.ndim == 1 else y.mean(1)).astype(np.float32)
     return soxr.resample(y, sr, sr_out) if sr != sr_out else y
@@ -32,7 +59,7 @@ rec = sherpa_onnx.OfflineRecognizer.from_transducer(encoder=f'{MODEL}/encoder.in
                                                    tokens=f'{MODEL}/tokens.txt', num_threads=os.cpu_count() or 4)
 out, asr, t_off = [], [], 0.                       # asr: [(word, t0, t1)] on the joined timeline
 for f in files:
-    x = load(os.path.join(V, f), SR); x16 = soxr.resample(x, SR, 16000)
+    x = tighten(load(os.path.join(V, f), SR), SR); x16 = soxr.resample(x, SR, 16000)
     hop = 160; n = len(x16) // hop; e = np.sqrt((x16[:n * hop].reshape(n, hop) ** 2).mean(1)); thr = max(e.max() * .02, np.percentile(e, 20) * 1.5); sil = e < thr
     # chunk ends: the longest pause in each 12–18 s window
     cuts, s = [0], 0

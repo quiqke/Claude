@@ -30,7 +30,7 @@ def words_of(text):
         cur['w'] += ch; i += 1
     return out
 shown = lambda ws: [{k: v for k, v in w.items() if k != 'h'} for w in ws if not w.get('h')]
-pages, notes_dialogs, hud, alerts, LT, titles = [], [], [], [], {}, {}
+pages, notes_dialogs, hud, alerts, LT, titles, FX = [], [], [], [], {}, {}, []
 for l in lines:
     tm = T['lines'][l['id']]; t0, t1 = tm['t0'] + a.lead, tm['t1'] + a.lead
     if tm.get('missing'): print('skip (not voiced):', l['id'], l['spoken'][:50]); continue
@@ -44,6 +44,13 @@ for l in lines:
     hud.append({'t': round(t0 - .15, 3), **l['hud']})
     LT[l['id']] = {'t0': round(t0, 3), 't1': round(t1, 3), 'kind': l['kind'], 'chapter': l.get('chapter'), 'tags': l.get('tags', {}),
                    'words': [{'w': re.sub(r'[«»"“”.,:;!?—…()]', '', w['w']).lower(), 't0': w['t0'], 't1': w['t1']} for w in ws]}
+    for e in l.get('fx', []):                         # game HUD events, at the block start or on a named word
+        te = t0
+        if e.get('at'):
+            key = re.sub(r'[^\wё]', '', e['at'].lower()).replace('ё', 'е')
+            hit = next((w for w in ws if re.sub(r'[^\wё]', '', w['w'].lower()).replace('ё', 'е').startswith(key)), None)
+            if hit: te = hit['t0']
+        FX.append({**{k: v for k, v in e.items() if k != 'at'}, 't': round(te, 3)})
     ws = shown(ws)
     if l['kind'] == 'title':
         titles.setdefault(l.get('chapter'), (t0, t1)); continue
@@ -77,7 +84,7 @@ for c in chapters:
     if first is None: continue                        # chapter not voiced at all
     t = T['lines'][first]['t0']
     cards.append({'t': round(t - .45, 3), 'd': 2.6, 'title': c['title'], 'n': c.get('n'), 'N': c.get('N')})
-json.dump({'W': W, 'H': H, 'theme': meta.get('theme', 'clean'), 'total': T['total'], 'pages': out_pages, 'boxes': notes_dialogs, 'hud': hud, 'cards': cards, 'alerts': alerts, 'lines': LT},
+json.dump({'W': W, 'H': H, 'theme': meta.get('theme', 'clean'), 'total': T['total'], 'pages': out_pages, 'boxes': notes_dialogs, 'hud': hud, 'cards': cards, 'alerts': alerts, 'lines': LT, 'fx': sorted(FX, key=lambda e: e['t'])},
           open(os.path.join(P, 'cues.json'), 'w', encoding='utf-8'), ensure_ascii=False)
 # subtitles file for YouTube (pages + note/dialog text)
 def ts(t): t = max(0, t); h = int(t // 3600); m = int(t % 3600 // 60); s = t % 60; return f'{h:02d}:{m:02d}:{int(s):02d},{int(round((s % 1) * 1000)):03d}'

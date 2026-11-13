@@ -97,6 +97,38 @@ for b in C['boxes']:
         for w in b['words']:
             for k in range(max(1, len(w['w']) // 3)): put(fx, S['blip'](f0 * (1 + .03 * (k % 3)), .55), w['t0'] + k * .05)
     elif not any(abs(e['t'] - b['t0']) < 1.5 and e.get('type') == 'scribble' for e in EV): put(bed, S['scribble'](min(3, b['t1'] - b['t0']), .8), b['t0'] + .2)
+# ── game HUD sounds (cues.fx): bars, items, goals, toasts, counters; a heartbeat that follows the danger meter
+S['statDown'] = lambda v=1: jingle([64, 58], .08, .5) * .8 * v
+S['statUp'] = lambda v=1: jingle([67, 74], .07, .25) * .8 * v
+S['pickup'] = lambda v=1: (jingle([76, 81, 88], .06, .125) + 0) * v
+S['goal'] = lambda v=1: sum(np.sin(2 * np.pi * f * tt(1.4)) * env(1.4, .01, .45) for f in (523, 659, 784)) * .12 * v
+S['pop'] = lambda v=1: np.sin(2 * np.pi * (500 + 900 * tt(.08) / .08) * tt(.08)) * env(.08, .002, .03) * .5 * v
+S['sub'] = lambda v=1: np.sin(2 * np.pi * (38 + 30 * np.exp(-tt(1.) * 5)) * tt(1.)) * env(1., .01, .35) * .9 * v
+prev_stat, dg = {}, []
+for e in C.get('fx', []):
+    ty = e['type']
+    if ty == 'stat' and e.get('value') is not None:
+        p0 = prev_stat.get(e['name']); prev_stat[e['name']] = e['value']
+        if p0 is not None and p0 != e['value']: put(fx, S['statDown' if e['value'] < p0 else 'statUp'](), e['t'], 1., -.5)
+    elif ty == 'item': put(fx, S['pickup'](), e['t'], 1., .4)
+    elif ty == 'objective': put(fx, S['goal'](), e['t'])
+    elif ty == 'toast': put(fx, S['pop'](), e['t'])
+    elif ty == 'counter' and e.get('value') is not None: put(fx, S['tick'](1.6), e['t'], 1., -.3)
+    elif ty == 'danger': dg.append((e['t'], e['value']))
+dg.append((DUR, None))
+for (t0, v), (t1, _) in zip(dg[:-1], dg[1:]):          # heartbeat bed while danger ≥ 40, faster when higher
+    if v is None or v < 40: continue
+    per = 60 / (60 + v); x = t0
+    while x < t1: put(bed, S['heart'](.35 + .5 * v / 100), x, 1., 0); x += per
+# whoosh on scene cuts (page EV type 'cut'), a low hit under red «опасность» words
+cuts = [e['t'] for e in EV if e.get('type') == 'cut']
+for c0, c1 in zip(cuts, cuts[1:] + [1e9]):
+    if c1 - c0 > 2.5 and c0 > 1: put(fx, S['whoosh'](.45), c0 - .25)
+for pg in C['pages']:
+    pc = None
+    for w in pg['words']:
+        if w.get('c') == 'danger' and pc != 'danger': put(fx, S['sub'](.55), w['t0'])
+        pc = w.get('c')
 # ── ambient bed under everything
 if a.bed != 'none':
     n = rng.standard_normal(N).astype(np.float32); base = lp(n, 500) * (.6 + .4 * np.sin(2 * np.pi * .08 * np.arange(N) / SR)) * .05

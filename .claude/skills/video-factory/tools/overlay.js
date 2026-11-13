@@ -133,10 +133,64 @@ export async function createOverlay(cv, cues, o = {}) {
     const S = th.alert, s = S.size * k; g.font = F(S.font, s); g.textAlign = 'center'; const w = g.measureText(al.text).width + 80 * k, y = (vert ? 170 : 130) * k;
     g.save(); g.globalAlpha = a * (Math.floor(t * 5) % 2 ? 1 : .55); box(W / 2 - w / 2, y - s, w, s * 2, { bg: S.bg, rad: 8 }); g.fillStyle = S.fg; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('⚠ ' + al.text, W / 2, y); g.restore();
   }
+  // ── game HUD: survival bars, objective, danger/heartbeat, counter, item pick-ups, toasts (cues.fx)
+  const FXL = cues.fx || [], STATCOL = ['#7dff6a', '#4fd6ff', '#ffd23f', '#ff8a3a', '#d77bff'];
+  function fxState(t) {
+    const st = { stats: new Map(), objective: null, danger: null, counter: null };
+    for (const e of FXL) { if (e.t > t) break;
+      if (e.type === 'stat') { if (e.value == null) st.stats.delete(e.name); else { const prev = st.stats.get(e.name); st.stats.set(e.name, { v: e.value, p: prev ? prev.v : e.value, t: e.t, i: prev ? prev.i : st.stats.size }); } }
+      if (e.type === 'objective') st.objective = { text: e.text, t: e.t };
+      if (e.type === 'danger') st.danger = { v: e.value, p: st.danger ? st.danger.v : 0, t: e.t };
+      if (e.type === 'counter') st.counter = e.value == null ? null : { name: e.name, v: e.value, t: e.t };
+    }
+    return st;
+  }
+  function pill(x, y, w, h, bg, a = 1) { g.save(); g.globalAlpha *= a; g.fillStyle = bg; rr(x, y, w, h, Math.min(h / 2, 14 * k)); g.fill(); g.restore(); }
+  function gameHud(t) {
+    const S = th.hud, f = s_ => F(S.font, s_), st = fxState(t), x0 = 40 * k; let y = (vert ? 130 : 110) * k;
+    g.save(); g.textBaseline = 'middle'; g.textAlign = 'left';
+    // stats
+    for (const [name, sv] of [...st.stats.entries()].sort((a, b) => a[1].i - b[1].i)) {
+      const p = seg(t, sv.t, sv.t + .6), v = sv.p + (sv.v - sv.p) * p, col = STATCOL[sv.i % STATCOL.length], bw = 300 * k, bh = 24 * k;
+      pill(x0 - 8 * k, y - 24 * k, bw + 230 * k, 48 * k, S.bg || 'rgba(0,0,0,.55)', .9);
+      g.font = f(S.size * .8 * k); g.fillStyle = S.fg; g.fillText(name.toUpperCase(), x0 + 6 * k, y);
+      const bx = x0 + 170 * k; g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(bx, y - bh / 2, bw, bh);
+      g.fillStyle = v < 25 ? (Math.floor(t * 4) % 2 ? '#ff3b3b' : col) : col; g.fillRect(bx, y - bh / 2, bw * Math.max(0, Math.min(100, v)) / 100, bh);
+      const fl = 1 - seg(t, sv.t, sv.t + .5); if (fl > 0 && sv.t > 0) { g.fillStyle = `rgba(255,255,255,${fl * .7})`; g.fillRect(bx, y - bh / 2, bw, bh); }
+      const d = sv.v - sv.p, dl = seg(t, sv.t, sv.t + 1.4); if (d && dl < 1) { g.globalAlpha = 1 - dl; g.font = f(S.size * .9 * k); g.fillStyle = d < 0 ? '#ff4a4a' : '#7dff6a'; g.fillText((d > 0 ? '+' : '') + Math.round(d), bx + bw + 14 * k, y - 26 * k * dl); g.globalAlpha = 1; }
+      y += 56 * k;
+    }
+    // objective
+    if (st.objective) { const o = st.objective, a = seg(t, o.t, o.t + .35), hi = 1 - seg(t, o.t + .4, o.t + 1.8); g.font = f(S.size * .85 * k); const txt = 'ЦЕЛЬ: ' + o.text.toUpperCase(), w = g.measureText(txt).width + 60 * k;
+      g.save(); g.translate(-(1 - a) * 300 * k, 0); pill(x0 - 8 * k, y - 24 * k, w, 48 * k, hi > 0 ? `rgba(255,210,63,${.25 + .5 * hi})` : (S.bg || 'rgba(0,0,0,.55)'), .95);
+      g.fillStyle = th.col.acc; g.beginPath(); g.moveTo(x0 + 8 * k, y); g.lineTo(x0 + 16 * k, y - 8 * k); g.lineTo(x0 + 24 * k, y); g.lineTo(x0 + 16 * k, y + 8 * k); g.fill();
+      g.fillStyle = S.fg; g.fillText(txt, x0 + 34 * k, y); g.restore(); y += 52 * k; }
+    // counter
+    if (st.counter) { const c = st.counter, pop = back(seg(t, c.t, c.t + .3)); g.save(); g.translate(x0 + 150 * k, y + 30 * k); g.scale(.8 + .2 * pop, .8 + .2 * pop);
+      g.font = f(S.size * .7 * k); const w1 = g.measureText(c.name.toUpperCase()).width; g.font = f(S.size * 1.6 * k); const w2 = g.measureText(String(c.v)).width;
+      pill(-150 * k, -34 * k, w1 + w2 + 70 * k, 68 * k, S.bg || 'rgba(0,0,0,.6)'); g.font = f(S.size * .7 * k); g.fillStyle = S.fg; g.fillText(c.name.toUpperCase(), -130 * k, 0);
+      g.font = f(S.size * 1.6 * k); g.fillStyle = th.col.num; g.fillText(String(c.v), -130 * k + w1 + 30 * k, 2 * k); g.restore(); }
+    // danger: heart + bar under the clock, red pulse at the screen edges
+    if (st.danger && st.danger.v > 0) { const dv = st.danger.p + (st.danger.v - st.danger.p) * seg(t, st.danger.t, st.danger.t + .8), bpm = 60 + dv * 1.0, beat = Math.pow(Math.max(0, Math.sin(t * Math.PI * bpm / 60)), 8);
+      const hx = W - 330 * k, hy = (vert ? 220 : 160) * k; pill(hx - 30 * k, hy - 22 * k, 320 * k, 44 * k, S.bg || 'rgba(0,0,0,.55)', .9);
+      g.save(); g.translate(hx, hy); g.scale(1 + .25 * beat, 1 + .25 * beat); g.fillStyle = '#ff3b3b'; g.beginPath(); const r = 9 * k; g.arc(-r * .55, -r * .3, r * .6, Math.PI, 0); g.arc(r * .55, -r * .3, r * .6, Math.PI, 0); g.lineTo(0, r * 1.1); g.closePath(); g.fill(); g.restore();
+      g.font = f(S.size * .6 * k); g.fillStyle = S.fg; g.fillText('СТРАХ', hx + 22 * k, hy); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(hx + 120 * k, hy - 8 * k, 150 * k, 16 * k); g.fillStyle = '#ff3b3b'; g.fillRect(hx + 120 * k, hy - 8 * k, 150 * k * dv / 100, 16 * k);
+      if (dv > 55) { const a = (dv - 55) / 45 * (.25 + .35 * beat), gr = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .45, W / 2, H / 2, Math.max(W, H) * .75); gr.addColorStop(0, 'rgba(255,0,0,0)'); gr.addColorStop(1, `rgba(200,0,0,${a})`); g.fillStyle = gr; g.fillRect(0, 0, W, H); } }
+    // item pick-ups (slide in from the right) and toasts (top centre)
+    let iy = (vert ? 420 : 300) * k;
+    for (const e of FXL) { if (e.type !== 'item' || t < e.t || t > e.t + 2.6) continue; const a = Math.min(back(seg(t, e.t, e.t + .35)), 1 - seg(t, e.t + 2.2, e.t + 2.6));
+      g.font = f(S.size * 1.05 * k); const txt = e.text.toUpperCase(), w = g.measureText(txt).width + 110 * k, x = W - 40 * k - w * a;
+      pill(x, iy - 34 * k, w, 68 * k, S.bg || 'rgba(0,0,0,.65)'); g.fillStyle = th.col.cool; g.beginPath(); g.arc(x + 40 * k, iy, 16 * k * (1 + .2 * Math.sin(t * 12)), 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = f(S.size * .8 * k); g.textAlign = 'center'; g.fillText('★', x + 40 * k, iy + 1 * k); g.textAlign = 'left';
+      g.font = f(S.size * 1.05 * k); g.fillStyle = th.col.acc; g.fillText(txt, x + 70 * k, iy); iy += 80 * k; }
+    for (const e of FXL) { if (e.type !== 'toast' || t < e.t || t > e.t + 2.4) continue; const a = Math.min(seg(t, e.t, e.t + .2), 1 - seg(t, e.t + 2, e.t + 2.4));
+      g.font = f(S.size * .8 * k); const txt = '✓ ' + e.text.toUpperCase(), w = g.measureText(txt).width + 50 * k, y2 = (vert ? 300 : 200) * k - (1 - a) * 30 * k;
+      g.globalAlpha = a; pill(W / 2 - w / 2, y2 - 24 * k, w, 48 * k, S.bg || 'rgba(0,0,0,.65)'); g.fillStyle = th.col.num; g.textAlign = 'center'; g.fillText(txt, W / 2, y2); g.textAlign = 'left'; g.globalAlpha = 1; }
+    g.restore();
+  }
   return {
     draw(t) {
       g.clearRect(0, 0, W, H);
-      if (o.hud !== false) hud(t);
+      if (o.hud !== false) { hud(t); gameHud(t); }
       for (const al of cues.alerts) alert(al, t);
       for (const c of cues.cards) card(c, t);
       const bx = cues.boxes.find(b => t >= b.t0 && t < b.t1);
