@@ -53,7 +53,7 @@ ORD = {'m': 'первый второй третий четвёртый пяты�
        'n': 'первое второе третье четвёртое пятое шестое седьмое восьмое девятое десятое одиннадцатое двенадцатое тринадцатое четырнадцатое пятнадцатое шестнадцатое семнадцатое восемнадцатое девятнадцатое двадцатое'.split()}
 GEN = {'ГЛАВА': 'f', 'ЧАСТЬ': 'f', 'ПРАВИЛО': 'n', 'ШАГ': 'm', 'СОВЕТ': 'm', 'ДЕНЬ': 'm', 'УРОВЕНЬ': 'm'}
 def spoken_title(title):
-    parts = [p.strip() for p in re.split(r'\s*[·:—]\s*', title) if p.strip()]
+    parts = [p.strip() for p in re.split(r'\s*·\s*', title, maxsplit=1) if p.strip()]
     def say(p):
         m = re.match(r'^([А-ЯЁA-Z]+)\s+(\d+)$', p, re.I)
         if m and 1 <= int(m.group(2)) <= 20: w = m.group(1).upper(); return w.capitalize() + ' ' + ORD[GEN.get(w, 'f')][int(m.group(2)) - 1]
