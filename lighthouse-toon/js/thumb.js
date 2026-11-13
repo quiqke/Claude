@@ -37,6 +37,30 @@ function creep(x, y, R) {                        // the thing in the fog: long p
 const vignette = (a = .55) => { const gr = g.createRadialGradient(960, 540, 300, 960, 540, 1150); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, `rgba(5,0,20,${a})`); g.fillStyle = gr; g.fillRect(0, 0, 1920, 1080); };
 
 const VAR = {
+  // F — «СВЕТ = СМЕРТЬ»: the beam on, things swarming the tower, the face
+  F() {
+    T.setCam(1380, 330, 1.9); S.ext(g, 2.3, { mode: 'night', lamp: 1, beam: 1, creatures: 30, fall: 0, fogTop: 640, fogDens: .9 });
+    T.setCam(); glowRings(g, 1080, 240, 520, '#fff2a0', .25); vignette(.5);
+    ring(1090, 700, 230, 330); arrow(1700, 420, 1330, 620, 46);
+    heroFace(420, 780, 320, { eyes: 'wide', brow: 'up', scream: 1.1, sweat: true, look: [1, -.7], side: .5 });
+    big('СВЕТ', 60, 140, 190, ['#fff6b0', '#ffd23f'], { rot: -.03 });
+    big('=', 640, 150, 170, '#ffffff', { rot: -.03 });
+    big('СМЕРТЬ', 820, 155, 190, ['#ff8a5a', '#ff1a1a'], { rot: -.03 });
+  },
+  // G — «ОН ЛЕЖИТ ТАМ 47 ДНЕЙ»: the old keeper on the glowing 118th step, in the torch beam
+  G() {
+    T.setCam(1150, 470, 1); S.stairs(g, 0, { step: 110, hero: false, torch: false, dark: false });
+    T.setCam(); T.tint(g, '#0a0420', .45);
+    shape(g, [[760, 760], [1920, 650], [1920, 880], [760, 1000]], { fill: '#ff9a3c', shade: '#e0602a', shadeOff: [0, -30] });
+    glowRings(g, 1340, 760, 520, '#ff7a2a', .3);
+    T.setRot(Math.PI / 2 - .1, 1000, 800); T.person(g, 'keeper', 1000, 800, 1.15, { armF: .1, armB: .1, face: { eyes: 'closed', mouth: 0, brow: 'sad', side: .2 } }); T.setRot(0);
+    g.save(); g.globalAlpha = .28; g.fillStyle = '#fff4c0'; g.beginPath(); g.moveTo(820, 0); g.lineTo(980, 0); g.lineTo(1920, 640); g.lineTo(1920, 1000); g.lineTo(1100, 1000); g.closePath(); g.fill(); g.restore();
+    vignette(.6);
+    ring(1350, 760, 470, 190); arrow(1780, 330, 1600, 560, 46);
+    heroFace(360, 800, 290, { eyes: 'wide', brow: 'up', scream: .9, sweat: true, look: [1, .8], side: .5 });
+    big('ОН ЛЕЖИТ ТАМ', 60, 120, 150, ['#ffffff', '#ffe14a'], { rot: -.03 });
+    big('47 ДНЕЙ', 900, 300, 200, ['#ff8a5a', '#ff1a1a'], { rot: -.04 });
+  },
   // D — BIG: one giant face, one giant number, two giant words (reads on a phone at thumbnail size)
   D() {
     T.setCam(1150, 470, 1); S.stairs(g, 0, { step: 117, warm: true, hero: false, torch: false, dark: false });
