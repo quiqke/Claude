@@ -77,6 +77,7 @@ S['warm'] = lambda v=1: np.sin(2 * np.pi * 73 * tt(2.5)) * env(2.5, .6, .9) * .5
 S['blip'] = lambda f=880, v=1: crush(sq(f, .035, .25) * .1 * env(.035, .001)) * v
 S['beep'] = lambda v=1: jingle([86, 86], .09, .5) * .6 * v
 S['whoosh'] = lambda v=1: bp(rng.standard_normal(int(.7 * SR)), 400, 4000) * np.sin(np.pi * tt(.7) / .7) ** 2 * .25 * v
+S['portal'] = lambda v=1: (np.sin(2 * np.pi * np.cumsum(200 + 1400 * (tt(.9) / .9) ** 2) / SR) * env(.9, .05, .4) * .25 + bp(rng.standard_normal(int(.9 * SR)), 2000, 9000) * env(.9, .1, .3) * .08) * v
 LONG = {'scratch', 'winch', 'rain', 'static', 'wind', 'crank', 'hiss', 'scribble'}
 PAN = {'knock': .35, 'tap': -.4, 'tick': -.3, 'step': .1, 'stepOut': .1, 'scratch': -.2, 'static': -.3, 'splat': .3}
 # ── events from the page
