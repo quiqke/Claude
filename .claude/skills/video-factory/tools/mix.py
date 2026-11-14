@@ -78,6 +78,10 @@ S['blip'] = lambda f=880, v=1: crush(sq(f, .035, .25) * .1 * env(.035, .001)) * 
 S['beep'] = lambda v=1: jingle([86, 86], .09, .5) * .6 * v
 S['whoosh'] = lambda v=1: bp(rng.standard_normal(int(.7 * SR)), 400, 4000) * np.sin(np.pi * tt(.7) / .7) ** 2 * .25 * v
 S['portal'] = lambda v=1: (np.sin(2 * np.pi * np.cumsum(200 + 1400 * (tt(.9) / .9) ** 2) / SR) * env(.9, .05, .4) * .25 + bp(rng.standard_normal(int(.9 * SR)), 2000, 9000) * env(.9, .1, .3) * .08) * v
+S['poll'] = lambda v=1: jingle([72, 76, 79], .08, .25) * v
+S['answer'] = lambda v=1: jingle([79, 84], .1, .125) * 1.1 * v
+S['stop'] = lambda v=1: (bp(rng.standard_normal(int(.5 * SR)), 300, 4000) * np.sin(np.pi * tt(.5) / .5) * np.sin(2 * np.pi * (8 - 6 * tt(.5)) * tt(.5)) * .6 + S['hit'](.8)[:int(.5 * SR)]) * v
+S['subscribe'] = lambda v=1: np.concatenate([np.sin(2 * np.pi * (500 + 900 * tt(.08) / .08) * tt(.08)) * env(.08, .002, .03) * .5, np.zeros(int(1.1 * SR)), sum(np.sin(2 * np.pi * f * tt(1.2)) * env(1.2, .002, .35) for f in (1318, 1975, 2637)) * .12]) * v
 LONG = {'scratch', 'winch', 'rain', 'static', 'wind', 'crank', 'hiss', 'scribble'}
 PAN = {'knock': .35, 'tap': -.4, 'tick': -.3, 'step': .1, 'stepOut': .1, 'scratch': -.2, 'static': -.3, 'splat': .3}
 # ── events from the page
@@ -142,6 +146,13 @@ if own:
 elif os.path.exists(os.path.join(P, 'music.wav')): m, _ = sf.read(os.path.join(P, 'music.wav'))
 else: m = np.zeros((N, 2))
 mus = np.zeros((N, 2), np.float32); n_ = min(N, len(m)); mus[:n_] = m[:n_] if m.ndim == 2 else np.stack([m[:n_]] * 2, 1)
+# ── silence before the big scares: the music drops out 0.6 s before, then a sub hit lands on the word
+for e in EV:
+    if e.get('type') == 'silence':
+        i0, i1, i2 = int((e['t'] - .6) * SR), int(e['t'] * SR), int((e['t'] + .35) * SR)
+        if 0 <= i0 < i1 < i2 <= N:
+            mus[i0:i1] *= np.linspace(1, 0, i1 - i0)[:, None] ** 2; mus[i1:i2] *= np.linspace(0, 1, i2 - i1)[:, None]
+            put(fx, S['sub'](1.0), e['t'])
 # ── ducking: music −8 dB and beds −4 dB while the voice speaks (fast attack, slow release)
 ve = uniform_filter1d(maximum_filter1d(np.abs(voice), int(.03 * SR)), int(.08 * SR)); on = (ve > .02).astype(np.float32)
 hop = 480; o = on[::hop]; g = np.zeros_like(o); x = 0.

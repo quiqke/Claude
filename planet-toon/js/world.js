@@ -57,6 +57,7 @@ export function hull(g, t, o = {}) {           // close-up of the hull with scra
   const rules = ['ПРАВИЛА:', '1. НЕ ШУМИ', '2. НЕ СТОЙ', '3. НЕ СМОТРИ НА 2-Е СОЛНЦЕ', '4. ПЕЙ СИНЮЮ', '5. НЕ ОТВЕЧАЙ ЭХУ', '6. НЕ ОТКРЫВАЙ ВТОРУЮ', '7. НАПИШИ ПРАВИЛА'];
   const n = o.reveal ?? 1;
   rules.forEach((r, i) => { const p = clamp(n * rules.length - i); if (p > 0) text(g, r, 600, 210 + i * 88, i ? 66 : 80, '#f8f8ff', { align: 'left', font: 'Caveat', weight: 700, outline: '#3a3f50', lw: 7, reveal: p, rot: -.02 }); });
+  if (o.old) { g.save(); g.globalAlpha = .8; shape(g, rrect(1640, 560, 170, 200, 8), { fill: '#e8dcc0', lw: 6, seed: 3 }); face(g, 1725, 640, 52, T.CAST.astro, { eyes: 'open', brow: 'neutral', smile: .5 }); text(g, '#41', 1725, 735, 30, '#5a4a3a', { outline: false, font: 'JBMono', weight: 800 }); g.restore(); }
   if (o.extra) text(g, o.extra, 1300, 900, 74, '#ff5a4a', { font: 'Caveat', weight: 700, outline: '#3a1a1a', lw: 8, rot: -.05, reveal: o.extraReveal ?? 1 });
   if (o.tally) { const k = Math.floor(o.tally); for (let i = 0; i < k; i++) { const gx = 1180 + (Math.floor(i / 5) % 5) * 130, gy = 170 + Math.floor(i / 25) * 120; if (i % 5 === 4) line(g, [[gx - 8, gy + 70], [gx + 90, gy + 10]], { line: '#f8f8ff', lw: 7, seed: i }); else line(g, [[gx + (i % 5) * 20, gy], [gx + (i % 5) * 20, gy + 80]], { line: '#f8f8ff', lw: 7, seed: i }); } }
 }
@@ -128,6 +129,7 @@ export function loopField(g, t, o = {}) {        // the reveal: dozens of old ca
   backdrop(g, t, PAL.dusk, { stars: true, moons: true });
   const n = Math.floor(o.n ?? 41);
   for (let i = 0; i < n; i++) { const d = .25 + hash(i, 3) * .6, x = hash(i, 1) * 2400 - 240, y = HZ + 40 + d * 400; pod(g, x, y, d * .45, { old: true, seed: i + 30 }); }
+  if (n >= 41) text(g, '41', 1500 - 240 * 0, HZ + 120, 34, '#ffd23f', { outline: '#231629', lw: 6, font: 'JBMono', weight: 800 });
   pod(g, 1250, 900, .9, { smoke: true, t });
   if (o.fall) { const k = clamp(o.fall); line(g, [[1700 - k * 600, 40 + k * 200], [1820 - k * 600, -40 + k * 200]], { line: '#ffd23f', lw: 14 }); shape(g, ell(1700 - k * 600, 40 + k * 200, 26, 26, 14), { fill: '#fff3c4' }); }
   if (o.hero !== false) astro(g, o.hx ?? 900, 1040, .76, { facing: 1, armF: o.scratch ? 1.3 + Math.sin(t * 14) * .25 : .2, face: o.face || { eyes: 'half', brow: 'sad', look: [1, 0] } });
