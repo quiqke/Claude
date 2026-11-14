@@ -132,3 +132,32 @@ export function loopField(g, t, o = {}) {        // the reveal: dozens of old ca
   if (o.fall) { const k = clamp(o.fall); line(g, [[1700 - k * 600, 40 + k * 200], [1820 - k * 600, -40 + k * 200]], { line: '#ffd23f', lw: 14 }); shape(g, ell(1700 - k * 600, 40 + k * 200, 26, 26, 14), { fill: '#fff3c4' }); }
   if (o.hero !== false) astro(g, o.hx ?? 900, 1040, .76, { facing: 1, armF: o.scratch ? 1.3 + Math.sin(t * 14) * .25 : .2, face: o.face || { eyes: 'half', brow: 'sad', look: [1, 0] } });
 }
+
+// ── extra shots for the long version
+export function screen(g, t, lines = [], o = {}) {      // the wrist screen, close
+  T.bands(g, 1920, [0], [o.bg || '#1b1035']);
+  shape(g, [[-200, 1300], [-200, 640], [400, 560], [1500, 600], [2200, 760], [2200, 1300]], { fill: '#f4f1ea', shade: '#cbc3b4', shadeOff: [0, -50] });
+  glowRings(g, 960, 520, 620, SCAN, .18);
+  shape(g, rrect(420, 230, 1080, 560, 50), { fill: '#0a2430', lw: 10 });
+  shape(g, rrect(470, 280, 980, 460, 30), { fill: '#06303c', line: SCAN, lw: 6 });
+  g.save(); g.font = '800 58px JBMono'; g.textBaseline = 'top';
+  let y = 320; const blink = Math.floor(t * 3) % 2;
+  lines.forEach((ln, i) => { const show = o.typed == null ? ln : ln.slice(0, Math.max(0, Math.floor(o.typed * 40 - i * 20))); g.fillStyle = i === 0 && o.alarm && blink ? '#ff5a4a' : SCAN; g.fillText(show, 520, y); y += 96; });
+  g.restore();
+}
+export function flashback(g, t, o = {}) {               // the orbital station before the lights went out
+  shape(g, rect(-400, -400, 3000, 2000), { fill: '#3a4256', line: false });
+  for (let x = -200; x < 2200; x += 260) shape(g, rrect(x, 80, 240, 700, 20), { fill: '#4a5470', line: '#2a3042', lw: 6, seed: x });
+  shape(g, ell(1350, 380, 210, 210, 36), { fill: '#0a0f2a', lw: 12 }); shape(g, ell(1400, 430, 140, 140, 30), { fill: '#3a8ad8', shade: '#2a5aa8', shadeOff: [-30, -20] });
+  shape(g, rect(-200, 760, 2400, 400), { fill: '#2a3042', line: false });
+  shape(g, rect(300, 700, 700, 60), { fill: '#5a6480', shade: '#3a4256', shadeOff: [0, -14] });
+  shape(g, [[600, 700], [700, 700], [690, 620], [610, 620]], { fill: '#f4f1ea', lw: 6 }); for (let i = 0; i < 3; i++) { const ph = (t * .6 + i / 3) % 1; g.save(); g.globalAlpha = .5 * (1 - ph); line(g, [[630 + i * 18, 610 - ph * 80], [640 + i * 18 + Math.sin(ph * 6) * 10, 570 - ph * 80]], { line: '#ffffff', lw: 5 }); g.restore(); }
+  for (const x of [300, 900, 1500]) { const on = !o.out || (o.out > 0 && Math.floor(t * 9 + x) % 3 === 0 && o.out < .6); shape(g, rrect(x, 20, 220, 30, 12), { fill: on ? '#fff6c8' : '#2a3042' }); if (on) glowRings(g, x + 110, 40, 200, '#fff6c8', .12); }
+  if (o.out >= .6) dark(g, .75, [{ x: 1400, y: 430, r: 260 }], '#05070f');
+  tint(g, '#e8c890', .22);
+}
+export function shadows(g, hx, fy, t) {                  // two shadows under you; the second one doesn't follow
+  g.save(); g.globalAlpha = .45; shape(g, ell(hx + 60, fy + 10, 120, 22, 20), { fill: '#7a2a0a', line: false }); shape(g, ell(1350, fy + 10, 120, 22, 20), { fill: '#3a0a00', line: false }); g.restore();
+}
+export function helmetInMud(g, x, y) { shape(g, [...ell(x, y, 90, 80, 24, Math.PI, Math.PI * 2), [x + 90, y], [x - 90, y]], { fill: '#f4f1ea', shade: '#cbc3b4', shadeOff: [-14, 0] }); shape(g, [...ell(x + 10, y - 30, 50, 34, 20, Math.PI, Math.PI * 2), [x + 60, y - 30], [x - 40, y - 30]], { fill: '#3a4a6a' }); line(g, [[x - 20, y - 55], [x + 5, y - 35], [x - 5, y - 20], [x + 25, y - 10]], { line: '#ffffff', lw: 4 }); text(g, 'НЕ СТОЙ', x, y - 120, 46, '#ffffff', { font: 'Caveat', weight: 700, outline: '#3a3f50', lw: 7, rot: -.06 }); }
+export function frostHand(g, x, y, a = 1) { g.save(); g.globalAlpha = a; shape(g, ell(x, y, 50, 60, 20), { fill: '#f4fdff', line: false }); for (let f = 0; f < 4; f++) shape(g, ell(x - 36 + f * 24, y - 80 + (f % 3 ? 0 : 14), 11, 30, 12), { fill: '#f4fdff', line: false, seed: f }); shape(g, ell(x + 58, y - 14, 12, 28, 12), { fill: '#f4fdff', line: false }); g.restore(); }
