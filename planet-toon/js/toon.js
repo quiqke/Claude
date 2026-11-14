@@ -3,7 +3,7 @@
 export const INK = '#231629';
 const hash = (a, b = 0, c = 0) => { let h = (a * 374761393 + b * 668265263 + c * 2147483647) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 export let BOIL = 0;                                    // boil drawing index (3 drawings at 12 fps)
-export function setTime(t) { BOIL = Math.floor(t * 12) % 3; }
+export function setTime(t) { BOIL = 0; }          // static hand-drawn line (no boil animation: steadier, cleaner picture)
 // camera: world point (x, y) → screen; zoom changes positions only, line weight stays constant (screen-space strokes)
 export const CAM = { x: 960, y: 540, z: 1, sx: 0, sy: 0 };
 export function setCam(x = 960, y = 540, z = 1, sx = 0, sy = 0) { CAM.x = x; CAM.y = y; CAM.z = z; CAM.sx = sx; CAM.sy = sy; }
