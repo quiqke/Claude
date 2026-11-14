@@ -1,6 +1,7 @@
 // film.js — «7 правил выживания на чужой планете»: scenes keyed to spoken words, a portal jump into every new zone.
 import * as T from './toon.js';
 import * as W from './world.js';
+import * as I from './inserts.js';
 let g, CU, SEG = [], EV = [], SH = [0, 0], PUNCH = [], CUTS = [], BIGW = [], FREEZE = [], POLL = null, STOP = null, SUB = null, O2 = [];
 const ev = (t, type, o = {}) => EV.push({ t: +(+t).toFixed(3), type, ...o });
 const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
@@ -35,7 +36,6 @@ export async function init(cv, cues) {
   for (const pg of cues.pages) { let pc = null; for (const w of pg.words) { if (w.c === 'danger' && pc !== 'danger') BIGW.push({ t: w.t0, w: w.w.replace(/[«»"“”.,:;!?—…]/g, '').toUpperCase() }); pc = w.c; } }
   for (const s of SEG) { if (s.scene === 'title') { ev(s.t0, 'whoosh'); ev(s.t0 + .1, 'portal'); } }
   for (const p of PUNCH) ev(p, 'hit', { v: .7 });
-  for (const ta of [2.3, 4.6, 6.8]) ev(ta, 'hit', { v: .45 });
   return { draw, EV };
 }
 const norm = w => w.toLowerCase().replace(/ё/g, 'е');
@@ -52,30 +52,38 @@ function pick(seg, t, list) {
   for (const [w, fn, n] of list) { const at = w == null ? seg.t0 : wt(seg, w, n || 0); if (at != null && t >= at - .1 && at - last >= 2) { cur = fn; last = at; } }
   return cur();
 }
+const RULES = ['ПРАВИЛА:', '1. НЕ ШУМИ', '2. НЕ СТОЙ', '3. НЕ СМОТРИ НА 2-Е СОЛНЦЕ', '4. ПЕЙ СИНЮЮ', '5. НЕ ОТВЕЧАЙ ЭХУ', '6. НЕ ОТКРЫВАЙ ВТОРУЮ', '7. НАПИШИ ПРАВИЛА'];
+const since = (seg, w, n = 0) => { const a = wt(seg, w, n); return a == null ? 0 : Math.max(0, t_ - a); };
+function hullBg(old) { T.shape(g, T.rect(-400, -400, 3000, 2000), { fill: old ? '#9a9080' : '#c6ccd8', line: false }); for (let y = 60; y < 1080; y += 260) T.line(g, [[-100, y], [2100, y]], { line: old ? '#7a7062' : '#9aa2b4', lw: 6, seed: y }); }
 const SC = {
   crash(t, s) {
     const off = wt(s, 'погас'), hero = (f, hx = 600) => W.crash(g, t, { hx, face: f });
     return pick(s, t, [
       [null, () => { cam(1000, 560, 1.1); hero({ eyes: 'wide', brow: 'up', look: [1, 0], sweat: true }); }],
-      [`семь`, () => { cam(1180, 700, 1.7); hero({ eyes: 'wide', brow: 'up', look: [1, 0] }); }],
       [`обшивке`, () => { cam(); W.hull(g, t, { reveal: 1 }); }],
       [`твоим`, () => { cam(600, HEAD_Y, 2.6); hero({ eyes: 'wide', brow: 'up', scream: 1, sweat: true, look: [1, 0] }); return { shake: wt(s, 'твоим') }; }],
-      [`сирены`, () => { cam(600, HEAD_Y, 2.4); hero({ eyes: Math.floor(t * 2) % 2 ? 'half' : 'open', brow: 'worried', look: [0, 0] }); T.tint(g, '#ff2020', .12 * (Math.sin(t * 9) + 1)); }],
-      [`экран`, () => { cam(); W.screen(g, t, ['! АТМОСФЕРА НЕПРИГОДНА', 'СВЯЗИ НЕТ', 'СПАСЕНИЕ НЕ ОЖИДАЕТСЯ'], { alarm: true, typed: t - (wt(s, 'экран') ?? t) }); }],
-      [`выбираешься`, () => { cam(760, 420, 1); hero({ eyes: 'open', brow: 'up', look: [-1, -1], mouth: .2 }, 900); }],
+      [`сирены`, () => { cam(); I.capsuleInterior(g, t, { alarm: true, face: { eyes: Math.floor(t * 2) % 2 ? 'half' : 'open', brow: 'worried' } }); }],
+      [`ремни`, () => { cam(960, 760, 1.7); I.capsuleInterior(g, t, { alarm: true, tight: true, face: { eyes: 'wide', brow: 'up', mouth: .3 } }); }],
+      [`экран`, () => { cam(); W.screen(g, t, ['! АТМОСФЕРА НЕПРИГОДНА', 'СВЯЗИ НЕТ', 'СПАСЕНИЕ НЕ ОЖИДАЕТСЯ'], { alarm: true, typed: since(s, 'экран') }); }],
+      [`выбираешься`, () => { cam(1000, 560, 1.1); hero({ eyes: 'open', brow: 'up', look: [-1, -1], mouth: .2 }, 900); }],
+      [`небо`, () => { cam(520, 200, 2.2); hero({ eyes: 'open' }, 900); }],
       [`тишина`, () => { cam(900, HEAD_Y, 2.4); hero({ eyes: 'half', brow: 'worried', look: [-1, -.3] }, 900); }],
-      [`последнее`, () => { cam(); W.flashback(g, t, { out: off != null && t >= off ? ss(off, off + 1, t) : 0 }); }],
+      [`последнее`, () => { cam(); W.flashback(g, t, {}); }],
+      [`кофе`, () => { cam(); I.cup(g, t, {}); T.tint(g, '#e8c890', .22); }],
+      [`погас`, () => { cam(); I.cup(g, t, { out: off != null ? ss(off, off + 1.2, t) : 0 }); T.tint(g, '#e8c890', .22); }],
     ]);
   },
   scratches(t, s) {
     const hand = wt(s, 'твой'), num = wt(s, 'сорок'), hero = f => W.crash(g, t, { hx: 600, face: f });
     return pick(s, t, [
       [null, () => { cam(1180, 760, 1.2); hero({ eyes: 'open', brow: 'worried', look: [1, 0] }); }],
-      [`процарапал`, () => { cam(); W.hull(g, t, { reveal: clamp((t - (wt(s, 'процарапал') ?? t)) / 4) }); }],
+      [`процарапал`, () => { cam(); hullBg(); I.carve(g, t, RULES, since(s, 'процарапал') / 5); }],
+      [`буквы`, () => { cam(800, 330, 1.8); W.hull(g, t, { reveal: 1 }); }],
       [`твой`, () => { cam(600, HEAD_Y, 2.6); hero({ eyes: 'wide', brow: 'up', scream: 1, sweat: true, look: [1, 0] }); return { shake: hand }; }],
-      [`правилами`, () => { cam(); W.hull(g, t, { reveal: 1, extra: '41', extraReveal: ss(num ?? t, (num ?? t) + .6, t) }); }],
+      [`правилами`, () => { cam(); W.hull(g, t, { reveal: 1 }); I.carve(g, t, ['41'], since(s, 'сорок') / 1.2, { x: 1260, y: 900, size: 120, fill: '#ff5a4a', ink: '#3a1a1a' }); }],
       [`помнишь`, () => { cam(600, HEAD_Y, 2.4); hero({ eyes: 'open', brow: 'worried', look: [1, .3] }); }],
-      [`скафандр`, () => { cam(1000, 560, 1.1); hero({ eyes: 'half', brow: 'angry', look: [1, 0], smile: .2 }); }],
+      [`скафандр`, () => { cam(); W.screen(g, t, ['! КИСЛОРОД УХОДИТ', 'ОСТАЛОСЬ: 6:41:10', 'ДВИГАЙСЯ'], { alarm: true, typed: since(s, 'скафандр') }); }],
+      [`решаешь`, () => { cam(1000, 560, 1.1); hero({ eyes: 'half', brow: 'angry', look: [1, 0], smile: .2 }); }],
     ]);
   },
   title(t, s) {
@@ -93,25 +101,28 @@ const SC = {
     const prints = () => { for (let i = 0; i < 6; i++) T.shape(g, T.ell(1100 + i * 110, 1040 + (i % 2) * 24, 26, 12, 12), { fill: '#2a0838', line: false, seed: i }); };
     return pick(s, t, [
       [null, () => { cam(960, 560, 1); J(900, { eyes: 'open', brow: 'up', look: [1, -.5] }); }],
+      [`стволы`, () => { cam(); T.shape(g, T.rect(-400, -400, 3000, 2000), { fill: '#3d0f52', line: false }); T.shape(g, T.rrect(700, -100, 520, 1400, 200), { fill: '#7a2a9a', shade: '#5a1a78', shadeOff: [-60, 0] }); const push = Math.sin(t * 3) * .5 + .5; T.shape(g, T.ell(960, 560, 120 + push * 30, 90 + push * 20, 24), { fill: '#5a1a78', line: false }); I.glove(g, 960, 600 + push * 20, 1.1, 0, 'palm'); }],
       [`цветы`, () => { cam(1500, 520, 2.4); J(900, { eyes: 'open' }); }],
-      [`ботинком`, () => { cam(900, 900, 2.1); J(900, { eyes: 'open' }); return { shake: cr }; }],
+      [`ботинком`, () => { cam(); T.shape(g, T.rect(-400, -400, 3000, 2000), { fill: '#3d0f52', line: false }); T.shape(g, T.rect(-400, 760, 3000, 800), { fill: '#4a1a5a', shade: '#36104a', shadeOff: [0, -30] }); const sn = since(s, 'хрустит'); T.line(g, [[500, 760], [880, 750 + (sn > 0 ? 30 : 0)], [960, 770]], { line: '#8a5a3a', lw: 22 }); T.line(g, [[1000, 770], [1100, 750 + (sn > 0 ? 30 : 0)], [1400, 760]], { line: '#8a5a3a', lw: 22 }); I.boot(g, 900, 770 + (sn > 0 ? 10 : 0), 1.1); if (sn > 0 && sn < .4) T.text(g, 'ХРУСТ!', 1300, 500, 120, '#ffe14a', { rot: -.15 }); return { shake: cr }; }],
       [`глаз`, () => { cam(1500, 540, 2.2); J(900, { eyes: 'wide' }); }],
       [`замираешь`, () => { cam(900, HEAD_Y, 2.5); J(900, { eyes: 'wide', brow: 'worried', look: [1, -.4], sweat: true, mouth: 0 }); }],
       [`считаешь`, () => { cam(960, 560, 1); J(900, { eyes: 'half', brow: 'worried', look: [1, -.4] }); }],
-      [`следы`, () => { cam(1250, 980, 2); J(900, { eyes: 'open' }, prints); }],
+      [`следы`, () => { cam(1250, 1000, 2); J(900, { eyes: 'open' }, prints); }],
       [`идешь`, () => { cam(960, 560, 1); J(1050, { eyes: 'open', brow: 'neutral', look: [1, .3] }, prints); }],
     ]);
   },
   swamp(t, s) {
     const st = wt(s, 'останавливаешься'), go = wt(s, 'шагай'), sink = st == null || t < st ? 0 : go == null || t < go ? ss(st, (go ?? st + 4), t) * .8 : .8 * (1 - ss(go, go + 1.2, t)), hx = 760 + (go != null && t > go ? Math.min(500, (t - go) * 90) : 0);
     const Sw = (o = {}) => W.swamp(g, t, { sink, walk: o.walk ?? (st == null || t < st || (go != null && t > go)), hx: o.hx ?? hx, face: o.face });
+    const mudBoot = (lvl) => { T.shape(g, T.rect(-400, -400, 3000, 2000), { fill: '#2f6230', line: false }); I.boot(g, 900, 860, 1.2); T.shape(g, [[-400, 860 - lvl * 300], ...Array.from({ length: 10 }, (_, i) => [-400 + i * 330, 850 - lvl * 300 + Math.sin(t * 3 + i) * 12]), [2400, 860 - lvl * 300], [2400, 1500], [-400, 1500]], { fill: '#a6e22e', shade: '#79b81f', shadeOff: [0, -30] }); for (let i = 0; i < 5; i++) { const r = 10 + ((t * 30 + i * 20) % 30); T.shape(g, T.ell(600 + i * 200, 830 - lvl * 300, r, r, 12), { fill: '#d8ff7a', lw: 4, seed: i }); } };
     return pick(s, t, [
       [null, () => { cam(960, 560, 1); Sw({ walk: true, hx: 700 }); }],
       [`пузыри`, () => { cam(400, 830, 2.4); Sw({ walk: true, hx: 700 }); }],
-      [`останавливаешься`, () => { cam(); W.screen(g, t, ['КАРТА: НЕТ ДАННЫХ', 'ВЕРХНИЙ СЛОЙ: ЖИДКИЙ', 'ГЛУБИНА: ?'], { typed: t - (st ?? t), bg: '#2f6230' }); }],
-      [`колено`, () => { cam(760, 960, 2.4); Sw({ face: { eyes: 'wide', brow: 'up', mouth: .5, sweat: true } }); }],
+      [`останавливаешься`, () => { cam(); W.screen(g, t, ['КАРТА: НЕТ ДАННЫХ', 'ПОД НОГАМИ: ЖИДКОЕ', 'ГЛУБИНА: ?'], { typed: since(s, 'останавливаешься'), bg: '#2f6230' }); }],
+      [`колено`, () => { cam(); mudBoot(.3 + .5 * ss(wt(s, 'колено') ?? t, (wt(s, 'колено') ?? t) + 3, t)); }],
       [`правило`, () => { cam(760, HEAD_Y + 150, 2.3); Sw({ face: { eyes: 'wide', brow: 'angry', look: [1, 0], sweat: true } }); }],
-      [`выдираешь`, () => { cam(960, 560, 1); Sw({ walk: true }); }],
+      [`выдираешь`, () => { cam(); mudBoot(.8 - .7 * ss(wt(s, 'выдираешь') ?? t, (wt(s, 'выдираешь') ?? t) + 1.2, t)); }],
+      [`двигаешься`, () => { cam(960, 560, 1); Sw({ walk: true }); }],
       [`шлем`, () => { cam(1520, 900, 2); Sw({ walk: true, hx: 1150 }); W.helmetInMud(g, 1560, 980); return { shake: wt(s, 'шлем') }; }],
       [`останавливаешься`, () => { cam(1250, 600, 1.3); Sw({ walk: true, hx: 1250, face: { eyes: 'half', brow: 'sad', look: [-1, .5] } }); W.helmetInMud(g, 1560, 980); }, 1],
     ]);
@@ -120,37 +131,43 @@ const SC = {
     const look = wt(s, 'смотрит'), D = (o = {}) => W.desert(g, t, { eye: look != null && t >= look ? ss(look, look + .3, t) : 0, lookX: -.6, hx: 880, ...o });
     return pick(s, t, [
       [null, () => { cam(960, 520, 1); D({ face: { eyes: 'open', brow: 'worried', look: [-1, -.4], sweat: true } }); }],
+      [`жарко`, () => { cam(880, HEAD_Y, 2.5); D({ face: { eyes: 'half', brow: 'worried', look: [0, 0], sweat: true, mouth: .3 } }); }],
       [`одно`, () => { cam(520, 260, 2.4); D(); }],
       [`второе`, () => { cam(1460, 240, 2.6); D(); return { shake: look }; }],
-      [`экран`, () => { cam(); W.screen(g, t, ['ОБЪЕКТ «СОЛНЦЕ-2»', '−1 КМ ЗА ВЗГЛЯД', 'НЕ СМОТРИ ВВЕРХ'], { alarm: true, typed: t - (wt(s, 'экран') ?? t), bg: '#c95a1a' }); }],
+      [`экран`, () => { cam(); W.screen(g, t, ['ОБЪЕКТ «СОЛНЦЕ-2»', '−1 КМ ЗА ВЗГЛЯД', 'НЕ СМОТРИ ВВЕРХ'], { alarm: true, typed: since(s, 'экран'), bg: '#c95a1a' }); }],
       [`песок`, () => { cam(880, HEAD_Y, 2.4); D({ face: { eyes: 'open', brow: 'worried', look: [0, 1], sweat: true } }); }],
       [`две`, () => { cam(1120, 960, 1.6); D({ face: { eyes: 'wide', brow: 'up', look: [1, 1], sweat: true } }); W.shadows(g, 880, 1010, t); return { shake: wt(s, 'две') }; }],
       [`оборачиваешься`, () => { cam(960, 560, 1); D({ cover: true }); W.shadows(g, 880, 1010, t); }],
-      [`садишься`, () => { cam(880, HEAD_Y + 60, 2.2); D({ face: { eyes: 'half', brow: 'sad', look: [0, .6], sweat: true } }); }],
+      [`руки`, () => { cam(); I.shakingHands(g, t, '#c95a1a'); }],
+      [`экране`, () => { cam(); W.screen(g, t, ['КИСЛОРОД: 60%', 'ПРОЙДЕНО: 1/2', 'ЦЕЛЬ: ?'], { typed: since(s, 'экране') }); }],
     ]);
   },
   lakes(t, s) {
     const mv = wt(s, 'шевелится'), L = (o = {}) => W.lakes(g, t, { wiggle: mv != null && t >= mv ? ss(mv, mv + .5, t) : 0, hx: 1100, ...o });
     return pick(s, t, [
       [null, () => { cam(960, 620, 1); L({ face: { eyes: 'open', brow: 'neutral', look: [-1, .3] } }); }],
-      [`фильтру`, () => { cam(); W.screen(g, t, ['ФИЛЬТР: НЕТ ВОДЫ', 'КИСЛОРОД: ПАДАЕТ', 'НАЙДИ ВОДУ'], { alarm: true, typed: t - (wt(s, 'фильтру') ?? t), bg: '#2a3a72' }); }],
+      [`фильтру`, () => { cam(); W.screen(g, t, ['ФИЛЬТР: НЕТ ВОДЫ', 'КИСЛОРОД: ПАДАЕТ', 'НАЙДИ ВОДУ'], { alarm: true, typed: since(s, 'фильтру'), bg: '#2a3a72' }); }],
       [`красное`, () => { cam(1420, 840, 1.8); L(); }],
-      [`шевелится`, () => { cam(1420, 820, 2.4); L(); return { shake: mv }; }],
-      [`экран`, () => { cam(); W.screen(g, t, ['АНАЛИЗ ЖИДКОСТИ', 'КРАСНАЯ: ЖИВАЯ', 'СИНЯЯ: ВОДА + ЖЕЛЕЗО'], { alarm: true, typed: t - (wt(s, 'экран') ?? t), bg: '#5a2030' }); }],
+      [`шевелится`, () => { cam(); I.tentacleBoot(g, t, ss(mv ?? t, (mv ?? t) + 2.5, t)); return { shake: mv }; }],
+      [`экран`, () => { cam(); W.screen(g, t, ['АНАЛИЗ ЖИДКОСТИ', 'КРАСНАЯ: ЖИВАЯ', 'СИНЯЯ: ВОДА + ЖЕЛЕЗО'], { alarm: true, typed: since(s, 'экран'), bg: '#5a2030' }); }],
       [`синему`, () => { cam(760, HEAD_Y + 110, 2); L({ kneel: true, hx: 760, face: { eyes: 'half', brow: 'neutral', look: [-1, .5] } }); }],
+      [`фильтр`, () => { cam(); W.screen(g, t, ['ФИЛЬТР: РАБОТАЕТ', 'КИСЛОРОД ▲ +10%', 'ВОДА: ЧИСТАЯ'], { typed: since(s, 'фильтр', 1), bg: '#2a3a72' }); }, 1],
       [`вздыхает`, () => { cam(1300, 760, 1.4); L({ kneel: true, hx: 760, wiggle: .5 }); }],
     ]);
   },
   ice(t, s) {
-    const nm = wt(s, 'имени'), I = (o = {}) => W.ice(g, t, { call: 0, ...o });
+    const nm = wt(s, 'имени'), I2 = (o = {}) => W.ice(g, t, { call: 0, ...o });
     return pick(s, t, [
-      [null, () => { cam(900, 560, 1); I({ face: { eyes: 'open', brow: 'worried', look: [1, -.4] } }); }],
-      [`шепчешь`, () => { cam(900, HEAD_Y, 2.4); I({ face: { eyes: 'open', brow: 'up', mouth: .3, look: [1, -.4] } }); }],
-      [`эхо`, () => { cam(1650, 380, 2); I({ call: .5 }); }],
-      [`говорит`, () => { cam(900, 520, 1); I({ call: .9, face: { eyes: 'wide', brow: 'up', look: [1, -.4], sweat: true } }); }],
-      [`имени`, () => { cam(300, 430, 2.2); I({ call: 1 }); return { shake: nm }; }],
-      [`зажимаешь`, () => { cam(900, HEAD_Y, 2.4); I({ face: { eyes: 'wide', brow: 'worried', look: [-1, 0], sweat: true } }); }],
-      [`иней`, () => { cam(1650, 420, 1.6); I({ face: { eyes: 'half', brow: 'worried', look: [1, -.4] } }); W.frostHand(g, 1650, 420, ss(wt(s, 'иней') ?? t, (wt(s, 'иней') ?? t) + 1, t)); }],
+      [null, () => { cam(900, 560, 1); I2({ face: { eyes: 'open', brow: 'worried', look: [1, -.4] } }); }],
+      [`прячешься`, () => { cam(900, 640, 1.5); I2({ face: { eyes: 'half', brow: 'worried', look: [1, 0] } }); }],
+      [`шепчешь`, () => { cam(900, HEAD_Y, 2.4); I2({ face: { eyes: 'open', brow: 'up', mouth: .3, look: [1, -.4] } }); }],
+      [`эхо`, () => { cam(1650, 380, 2); I2({ call: .5 }); }],
+      [`говорит`, () => { cam(900, 520, 1); I2({ call: .9, face: { eyes: 'wide', brow: 'up', look: [1, -.4], sweat: true } }); }],
+      [`имени`, () => { cam(300, 430, 2.2); I2({ call: 1 }); return { shake: nm }; }],
+      [`зажимаешь`, () => { cam(); I.handOnHelmet(g, t); }],
+      [`выключаешь`, () => { cam(); W.screen(g, t, ['МИКРОФОН: ВЫКЛ', 'ВНЕШНИЙ ЗВУК: 0', 'ТИШИНА'], { typed: since(s, 'выключаешь'), bg: '#0d2a46' }); }],
+      [`утра`, () => { cam(900, 560, 1); I2({ call: .6, face: { eyes: 'half', brow: 'worried', look: [1, 0] } }); }],
+      [`иней`, () => { cam(1650, 420, 1.6); I2({ face: { eyes: 'half', brow: 'worried', look: [1, -.4] } }); W.frostHand(g, 1650, 420, ss(wt(s, 'иней') ?? t, (wt(s, 'иней') ?? t) + 1, t)); }],
     ]);
   },
   second_pod(t, s) {
@@ -160,19 +177,25 @@ const SC = {
       [`дым`, () => { cam(1450, 560, 2); B(); }],
       [`бежишь`, () => { cam(1100, 600, 1.2); B({ hx: 950, walk: true, face: { eyes: 'wide', brow: 'up', look: [1, 0] } }); }],
       [`твоя`, () => { cam(1450, 680, 2.4); B({ hx: 950 }); return { shake: wt(s, 'твоя') }; }],
-      [`рука`, () => { cam(1300, 690, 2.2); B({ hx: 1180, face: { eyes: 'open', brow: 'sad', look: [1, 0] } }); }],
+      [`рука`, () => { cam(); I.handToHatch(g, t, ss(wt(s, 'рука') ?? t, (wt(s, 'рука') ?? t) + 2.5, t)); }],
       [`отпускаешь`, () => { cam(960, 560, 1); B({ hx: 1000, walk: true, face: { eyes: 'half', brow: 'sad', look: [-1, 0] } }); }],
     ]);
   },
-  second_pod_scratch(t, s) { const k = wt(s, 'считаешь') ?? wt(s, 'сорок'), r = wt(s, 'приписка'); cam(); W.hull(g, t, { old: true, reveal: 1, tally: k != null && t >= k ? 41 * ss(k, k + 1.5, t) : 0, extra: r != null && t >= r ? '41 раз. Не сдавайся. Это всё ещё ты' : null, extraReveal: r != null ? clamp((t - r) / 3) : 0 }); },
+  second_pod_scratch(t, s) {
+    const k = wt(s, 'считаешь') ?? wt(s, 'сорок'), r = wt(s, 'приписка');
+    cam(); W.hull(g, t, { old: true, reveal: 1, tally: k != null && t >= k ? 41 * ss(k, k + 2.5, t) : 0 });
+    if (r != null && t >= r) I.carve(g, t, ['41 раз. Не сдавайся.', 'Это всё ещё ты'], (t - r) / 4, { x: 1000, y: 860, size: 64, fill: '#ff5a4a', ink: '#3a1a1a', lh: 80 });
+  },
   loop(t, s) {
-    const eyes = wt(s, 'поднимаешь'), sit = wt(s, 'садишься');
+    const eyes = wt(s, 'поднимаешь'), sit = wt(s, 'садишься'), sc = wt(s, 'царапаешь');
     return pick(s, t, [
       [null, () => { cam(1250, 760, 1.3); W.loopField(g, t, { n: 0, hx: 1000, face: { eyes: 'half', brow: 'sad', look: [1, 0] } }); }],
-      [`берешь`, () => { cam(1150, 760, 2.4); W.loopField(g, t, { n: 0, hx: 1030, scratch: true, face: { eyes: 'open', brow: 'sad', look: [1, .3] } }); }],
+      [`берешь`, () => { cam(); hullBg(); I.carve(g, t, RULES, 0.002 + since(s, 'царапаешь') / 7); }],
       [`поднимаешь`, () => { const k = ss(eyes, eyes + 3, t); cam(1250 - 290 * k, 820 - 280 * k, 1.6 - .6 * k); W.loopField(g, t, { n: 41, hx: 1030, face: { eyes: 'wide', brow: 'up', look: [-1, -.3] } }); }],
       [`понимаешь`, () => { cam(1030, HEAD_Y + 30, 2.4); W.loopField(g, t, { n: 41, hx: 1030, face: { eyes: 'open', brow: 'sad', look: [-1, 0] } }); }],
-      [`садишься`, () => { cam(1100, 760, 1.4); W.loopField(g, t, { n: 41, hx: 1030, face: { eyes: t > sit + 3 ? 'closed' : 'half', brow: 'sad', smile: .3 } }); }],
+      [`садишься`, () => { cam(1100, 760, 1.4); W.loopField(g, t, { n: 41, hx: 1030, face: { eyes: 'half', brow: 'sad', smile: .3 } }); }],
+      [`кончается`, () => { cam(); W.screen(g, t, ['КИСЛОРОД: 0%', 'ПОПЫТКА 42: ЗАВЕРШЕНА', 'ПРАВИЛА: ОБНОВЛЕНЫ'], { alarm: true, typed: since(s, 'кончается') }); }],
+      [`последнее`, () => { cam(); W.hull(g, t, { reveal: 1 }); T.dark(g, .6 * ss(wt(s, 'последнее') ?? t, s.t1, t), [{ x: 960, y: 500, r: 700 }], '#05070f'); }],
     ]);
   },
   question(t, s) { cam(960, 540, 1); W.loopField(g, t, { n: 41, hx: 1030, fall: ss(s.t0, s.t1, t), face: { eyes: 'closed', brow: 'sad', smile: .3 } }); },
@@ -183,13 +206,9 @@ function draw(t) {
   const tReal = t; for (const [a, b, ft] of FREEZE) if (t >= a && t < b) t = ft ?? a;          // freeze-frame windows
   t_ = t; T.setTime(t); const s = segAt(t), f = SC[s.scene] || SC.crash;
   SH = [0, 0]; g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#000'; g.fillRect(0, 0, 1920, 1080);
-  // flash-forward teaser inside the hook: 0.35 s glimpses of what is coming, with a glitch
-  const TZ = [[2.3, () => { T.setCam(1460, 260, 2.2); W.desert(g, t, { eye: 1, lookX: -.2, hx: 880 }); }], [4.6, () => { T.setCam(900, 420, 1.5); W.ice(g, t, { call: .9 }); }], [6.8, () => { T.setCam(960, 600, .95); W.loopField(g, t, { n: 41, hero: false }); }]];
-  for (const [ta, fn] of TZ) if (t >= ta && t < ta + .35) { fn(); T.setCam(); T.tint(g, '#3df2ff', .12); for (let i = 0; i < 6; i++) { const y = (i * 173 + Math.floor(t * 24) * 61) % 1080; g.drawImage(g.canvas, 0, y, 1920, 40, (i % 2 ? 30 : -30), y, 1920, 40); } return; }
   let r = f(t, s) || {};
   if (r.shake != null && t > r.shake && t < r.shake + .4) { SH = shakeAt(t, r.shake); g.fillRect(0, 0, 1920, 1080); r = f(t, s) || {}; }
   T.setCam(); T.setRot(0);
-  if (s.scene !== 'title' && t - s.t0 < .12 && s.i > 0) T.tint(g, '#ffffff', .5 * (1 - (t - s.t0) / .12));     // cut flash
   // zone tag (retro terminal) typed in at every portal jump, stays 3.5 s
   const ts = [...SEG].reverse().find(x => x.scene === 'title' && t >= x.t0 && t < x.t0 + 3.6);
   if (ts && ts.next) { const tag = `ЗОНА ${ts.n} · ${ZONE[ts.next.scene] || ''}`, n = Math.floor(clamp((t - ts.t0 - .25) * 34, 0, tag.length)), a = clamp((ts.t0 + 3.6 - t) / .3);

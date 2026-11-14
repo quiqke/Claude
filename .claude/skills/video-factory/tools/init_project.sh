@@ -9,6 +9,7 @@ SK=$(cd "$(dirname "$0")/.." && pwd); LIB=${LIB:-/root/lemo-opuscar}
 W=${FMT%x*}; H=${FMT#*x}
 mkdir -p "$P/voice" "$P/js" "$P/overlay/fonts" "$P/out"
 cp "$SK/tools/overlay.js" "$P/overlay/"; cp "$SK/assets/fonts/"* "$P/overlay/fonts/"
+case "$STYLE" in toon|scifi-toon|cartoon) cp "$SK/assets/toon/"*.js "$P/js/";; esac
 if [ -n "$STYLE" ] && [ -d "$LIB/styles/$STYLE/demo" ]; then mkdir -p "$P/js/engine"; cp "$LIB/styles/$STYLE/demo/"*.js "$P/js/engine/" 2>/dev/null || true; fi
 [ -f "$P/script.md" ] || cat > "$P/script.md" <<EOF
 ---
