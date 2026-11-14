@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Сколько ты проживёшь</title>
+<link rel="stylesheet" href="fonts.css">
+<style>
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #EFE3C8; }
+  svg, canvas { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+  #paper { mix-blend-mode: multiply; pointer-events: none; }
+  #fx { pointer-events: none; }
+  .mul { mix-blend-mode: multiply; }
+</style>
+</head>
+<body>
+<svg id="stage" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- line boil (new seed every 0.1s) + ink grain -->
+    <filter id="boil" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence id="boilT" type="fractalNoise" baseFrequency="0.022" numOctaves="2" seed="1" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="5" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="2" seed="4" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -22 15.2" result="gm"/>
+      <feComposite in="d" in2="gm" operator="in"/>
+    </filter>
+    <filter id="ink" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="9" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -22 15.4" result="gm"/>
+      <feComposite in="SourceGraphic" in2="gm" operator="in"/>
+    </filter>
+    <filter id="stampInk" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" seed="11" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="7" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="3" seed="21" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -9 5.9" result="gm"/>
+      <feComposite in="d" in2="gm" operator="in"/>
+    </filter>
+    <clipPath id="frameClip"><rect width="1920" height="1080"/></clipPath>
+  </defs>
+  <g clip-path="url(#frameClip)">
+    <g id="cam"><g id="world"></g></g>
+    <g id="hud"></g>
+    <g id="wipe"></g>
+    <rect id="flash" width="1920" height="1080" fill="#FFFFFF" opacity="0"/>
+    <rect id="fade" width="1920" height="1080" fill="#161B33" opacity="0"/>
+  </g>
+</svg>
+<canvas id="paper" width="1920" height="1080"></canvas>
+<canvas id="fx" width="1920" height="1080"></canvas>
+
+<script>
+// ============================================================
+// basic utilities
+// ============================================================
+const NS = 'http://www.w3.org/2000/svg';
+const C = {
+  paper: '#EFE3C8', navy: '#1A1F3A', teal: '#1F8A8A', yellow: '#F2B31B', red: '#E2432B', sky: '#8FC3E8',
+  cream: '#FFF6E4', night: '#161B33', night2: '#2B3466',
+};
+const F = {
+  serif: "'Playfair Display'", disp: "'Unbounded'", mono: "'JetBrains Mono'", sans: "'Rubik'", hand: "'Neucha'",
+};
+const FPS = 30, DUR = 50;
+window.DUR = DUR; window.EV = [];
+
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function txt(parent, str, attrs) { const e = el('text', attrs, parent); e.textContent = str; return e; }
+function tf(e, x = 0, y = 0, s = 1, r = 0, sy) {
+  e.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${r.toFixed(2)}) scale(${s.toFixed(4)} ${(sy ?? s).toFixed(4)})`);
+}
+function op(e, o) { e.setAttribute('opacity', Math.max(0, Math.min(1, o)).toFixed(3)); }
+function show(e, v) { e.style.display = v ? '' : 'none'; }
+
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, p) => a + (b - a) * p;
+const E = {
+  out: p => 1 - Math.pow(1 - p, 3),
+  in: p => p * p * p,
+  io: p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2,
+  back: p => { const c = 1.9; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); },
+  elastic: p => p <= 0 ? 0 : p >= 1 ? 1 : Math.pow(2, -10 * p) * Math.sin((p * 10 - 0.75) * 2 * Math.PI / 3) + 1,
+};
+const pop = (t, t0, d = 0.35) => t < t0 ? 0 : E.back(seg(t, t0, t0 + d));
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+const mctx = document.createElement('canvas').getContext('2d');
+function measure(str, size, family, weight = 900) { mctx.font = `${weight} ${size}px ${family}`; return mctx.measureText(str).width; }
+
+// per-character text (can pop in char by char), optional misregistration shadow
+function chars(parent, str, o) {
+  const { x, y, size, family, weight = 900, fill = C.navy, anchor = 'start', ls = 0, shadow, stroke, sw = 0 } = o;
+  const g = el('g', {}, parent);
+  const arr = [...str];
+  const widths = arr.map(c => measure(c, size, family, weight));
+  const total = widths.reduce((a, b) => a + b, 0) + ls * (arr.length - 1);
+  let cx = anchor === 'middle' ? x - total / 2 : anchor === 'end' ? x - total : x;
+  const items = arr.map((ch, i) => {
+    const cg = el('g', {}, g);
+    const base = { x: 0, y: 0, 'font-size': size, 'font-family': family, 'font-weight': weight, 'text-anchor': 'middle' };
+    if (shadow) txt(cg, ch, { ...base, x: shadow.dx, y: shadow.dy, fill: shadow.fill, class: 'mul' });
+    const st = stroke ? { stroke, 'stroke-width': sw, 'paint-order': 'stroke', 'stroke-linejoin': 'round' } : {};
+    txt(cg, ch, { ...base, fill, ...st });
+    const it = { g: cg, x: cx + widths[i] / 2, y, w: widths[i], size };
+    cx += widths[i] + ls;
+    tf(cg, it.x, it.y);
+    return it;
+  });
+  return { g, items, total };
+}
+// per-character animation: pop in (squash-and-rebound from below)
+function charsPop(c, t, t0, stagger = 0.05, d = 0.38, from = 60) {
+  c.items.forEach((it, i) => {
+    const s = t0 + i * stagger;
+    const p = seg(t, s, s + d);
+    const h = it.size * 0.35;
+    if (t < s) { op(it.g, 0); return; }
+    op(it.g, 1);
+    const sc = E.back(p);
+    const sq = 1 + 0.25 * Math.sin(p * Math.PI) * (1 - p);
+    it.g.setAttribute('transform', `translate(${it.x} ${it.y + from * (1 - E.out(p))}) translate(0 ${-h}) scale(${(sc / sq).toFixed(3)} ${(sc * sq).toFixed(3)}) translate(0 ${h})`);
+  });
+}
+function charsIdle(c, t, amp = 4, spd = 3) {
+  c.items.forEach((it, i) => tf(it.g, it.x, it.y + Math.sin(t * spd + i * 0.8) * amp));
+}
+
+// halftone dots: f(x,y) → 0..1 dot size
+function halftone(parent, { x0 = 0, y0 = 0, w = 1920, h = 1080, step = 22, angle = 15, color, f, maxK = 0.62 }) {
+  const a = angle * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+  const n = Math.ceil(Math.hypot(w, h) / step / 2) + 2;
+  let d = '';
+  for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) {
+    const u = i * step, v = j * step;
+    const x = x0 + w / 2 + u * ca - v * sa, y = y0 + h / 2 + u * sa + v * ca;
+    if (x < x0 - step || x > x0 + w + step || y < y0 - step || y > y0 + h + step) continue;
+    const s = clamp(f(x, y)); if (s < 0.05) continue;
+    const r = s * step * maxK;
+    d += `M${(x - r).toFixed(1)} ${y.toFixed(1)}a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(2 * r).toFixed(1)} 0a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(-2 * r).toFixed(1)} 0`;
+  }
+  return el('path', { d, fill: color }, parent);
+}
+const radial = (cx, cy, R, pw = 1.2) => (x, y) => Math.pow(clamp(1 - Math.hypot(x - cx, y - cy) / R), pw);
+const edge = (R = 900, pw = 1.6) => (x, y) => Math.pow(clamp(Math.hypot(x - 960, y - 540) / R - 0.35), pw) * 1.3;
+
+function bg(parent, color) { return el('rect', { width: 1920, height: 1080, fill: color }, parent); }
+
+// subtitle bar
+function caption(parent, parts, { x = 960, y = 980, size = 46 } = {}) {
+  const g = el('g', {}, parent);
+  const inner = el('g', {}, g);
+  const w = parts.reduce((a, [s]) => a + measure(s, size, F.sans, 900), 0);
+  const padX = 34, hgt = size * 1.7;
+  el('rect', { x: -w / 2 - padX + 8, y: -hgt / 2 + 8, width: w + padX * 2, height: hgt, rx: 14, fill: C.teal, class: 'mul' }, inner);
+  el('rect', { x: -w / 2 - padX, y: -hgt / 2, width: w + padX * 2, height: hgt, rx: 14, fill: C.navy }, inner);
+  const t = el('text', { x: -w / 2, y: size * 0.36, 'font-size': size, 'font-family': F.sans, 'font-weight': 900 }, inner);
+  parts.forEach(([s, col]) => { const sp = el('tspan', { fill: col || C.cream }, t); sp.textContent = s; });
+  return { g, inner, x, y };
+}
+function captionAnim(c, t, t0) {
+  const p = seg(t, t0, t0 + 0.4);
+  if (t < t0) { op(c.g, 0); return; }
+  op(c.g, seg(t, t0, t0 + 0.12));
+  tf(c.g, c.x, c.y + 40 * (1 - E.out(p)), lerp(0.8, 1, E.back(p)), -1.2 * (1 - p) - 0.6);
+}
+
+// stamp
+function stampEl(parent, str, { size = 200, color = C.red, family = F.sans, padX = 50, padY = 26, border = 12 } = {}) {
+  const g = el('g', {}, parent);
+  const inner = el('g', { filter: 'url(#stampInk)' }, g);
+  const w = measure(str, size, family, 900) + padX * 2, h = size * 1.08 + padY * 2;
+  el('rect', { x: -w / 2, y: -h / 2, width: w, height: h, rx: 22, fill: 'none', stroke: color, 'stroke-width': border }, inner);
+  el('rect', { x: -w / 2 + border * 1.8, y: -h / 2 + border * 1.8, width: w - border * 3.6, height: h - border * 3.6, rx: 12, fill: 'none', stroke: color, 'stroke-width': border * 0.35 }, inner);
+  txt(inner, str, { x: 0, y: size * 0.36, 'font-size': size, 'font-family': family, 'font-weight': 900, fill: color, 'text-anchor': 'middle' });
+  return { g, w, h };
+}
+function stampAnim(s, t, t0, x, y, rot) {
+  if (t < t0 - 0.09) { op(s.g, 0); return; }
+  const p = seg(t, t0 - 0.09, t0);
+  const after = Math.max(0, t - t0);
+  const bounce = 1 + 0.05 * Math.sin(after * 30) * Math.exp(-after * 9);
+  op(s.g, p < 1 ? 0.3 + 0.7 * p : 0.93);
+  tf(s.g, x, y, lerp(2.6, 1, E.in(p)) * bounce, rot);
+}
+
+function heartPath(s = 1) {
+  return `M0 ${30 * s}C${-40 * s} 0 ${-50 * s} ${-30 * s} ${-25 * s} ${-45 * s}C${-10 * s} ${-52 * s} 0 ${-40 * s} 0 ${-30 * s}C0 ${-40 * s} ${10 * s} ${-52 * s} ${25 * s} ${-45 * s}C${50 * s} ${-30 * s} ${40 * s} 0 0 ${30 * s}Z`;
+}
+
+// ============================================================
+// the subject: a little astronaut ("ТЫ"). Recipe from the style: 7 px navy outline, flat fills, glossy eyes, boil.
+// ============================================================
+const LW = 7;
+function capsule(parent, len, w, fill) {           // hangs down from (0,0) to (0,len)
+  return el('rect', { x: -w / 2, y: -w / 2, width: w, height: len + w, rx: w / 2, fill, stroke: C.navy, 'stroke-width': LW }, parent);
+}
+function astro(parent, { wings = false, bracelet = true } = {}) {
+  const g = el('g', {}, parent);
+  const inner = el('g', { filter: 'url(#boil)' }, g);
+  const body = el('g', {}, inner);
+  const mk = (x, y, len, w, isArm, side) => {
+    const j = el('g', {}, body);
+    if (isArm && wings) {                            // cardboard wing tied to the arm (Titan)
+      el('path', { d: `M0 -10 L${side * 210} 40 L${side * 190} 120 L0 ${len}Z`, fill: C.paper, stroke: C.navy, 'stroke-width': LW, 'stroke-linejoin': 'round' }, j);
+      el('path', { d: `M${side * 40} 20 L${side * 170} 60 M${side * 30} 60 L${side * 160} 100`, stroke: C.navy, 'stroke-width': 3, fill: 'none' }, j);
+    }
+    capsule(j, len, w, C.cream);
+    if (isArm) {
+      el('circle', { cx: 0, cy: len + 12, r: 21, fill: C.cream, stroke: C.navy, 'stroke-width': LW }, j);
+      if (bracelet && side < 0) {
+        el('rect', { x: -27, y: len - 26, width: 54, height: 20, rx: 6, fill: C.red, stroke: C.navy, 'stroke-width': 4 }, j);
+        j.light = el('circle', { cx: 0, cy: len - 16, r: 5, fill: C.yellow }, j);
+      }
+    } else {
+      el('rect', { x: -31, y: len - 4, width: 62, height: 34, rx: 13, fill: C.navy }, j);
+    }
+    return { j, x, y };
+  };
+  const legL = mk(-26, -118, 84, 46, false, -1), legR = mk(26, -118, 84, 46, false, 1);
+  el('rect', { x: -74, y: -258, width: 148, height: 120, rx: 26, fill: C.yellow, stroke: C.navy, 'stroke-width': LW }, body);   // backpack
+  el('rect', { x: -58, y: -252, width: 116, height: 142, rx: 36, fill: C.cream, stroke: C.navy, 'stroke-width': LW }, body);    // torso
+  el('rect', { x: -32, y: -214, width: 64, height: 36, rx: 7, fill: C.paper, stroke: C.navy, 'stroke-width': 4 }, body);
+  [[-15, C.red], [0, C.yellow], [15, C.teal]].forEach(([x, c]) => el('circle', { cx: x, cy: -196, r: 6, fill: c }, body));
+  const armL = mk(-66, -232, 78, 40, true, -1), armR = mk(66, -232, 78, 40, true, 1);
+  const headG = el('g', {}, body);
+  el('line', { x1: 34, y1: -60, x2: 52, y2: -100, stroke: C.navy, 'stroke-width': 6 }, headG);
+  el('circle', { cx: 52, cy: -102, r: 10, fill: C.red, stroke: C.navy, 'stroke-width': 5 }, headG);
+  el('circle', { cx: 0, cy: 0, r: 76, fill: C.cream, stroke: C.navy, 'stroke-width': LW }, headG);
+  el('ellipse', { cx: 0, cy: 6, rx: 56, ry: 44, fill: C.sky, stroke: C.navy, 'stroke-width': LW }, headG);
+  el('path', { d: 'M-40 -14 Q-30 -32 -8 -36', stroke: C.cream, 'stroke-width': 7, fill: 'none', 'stroke-linecap': 'round' }, headG);
+  const eyes = [-19, 19].map(x => {
+    const e = el('g', {}, headG);
+    el('ellipse', { cx: 0, cy: 0, rx: 9.5, ry: 13, fill: C.navy }, e);
+    el('circle', { cx: 3, cy: -5, r: 3.6, fill: '#fff' }, e);
+    el('circle', { cx: -3, cy: 4, r: 1.8, fill: '#fff' }, e);
+    return { e, x };
+  });
+  const happy = [-19, 19].map(x => el('path', { d: `M${x - 10} 6 Q${x} -8 ${x + 10} 6`, stroke: C.navy, 'stroke-width': 5, fill: 'none', 'stroke-linecap': 'round' }, headG));
+  const brows = [-19, 19].map(x => el('line', { x1: x - 10, y1: -22, x2: x + 10, y2: -22, stroke: C.navy, 'stroke-width': 4.5, 'stroke-linecap': 'round' }, headG));
+  const mouth = el('ellipse', { cx: 0, cy: 28, rx: 9, ry: 3, fill: C.navy }, headG);
+  return { g, inner, body, legL, legR, armL, armR, headG, eyes, happy, brows, mouth };
+}
+// pose: la/ra arm angles (deg, 0 = hanging, + = outward), ll/rl legs, sq body squash (1 = none), tilt (deg), bob (px up)
+function pose(a, { la = 8, ra = 8, ll = 4, rl = 4, sq = 1, tilt = 0, bob = 0, headTilt = 0 } = {}) {
+  tf(a.armL.j, a.armL.x, a.armL.y, 1, la); tf(a.armR.j, a.armR.x, a.armR.y, 1, -ra);
+  tf(a.legL.j, a.legL.x, a.legL.y, 1, ll); tf(a.legR.j, a.legR.x, a.legR.y, 1, -rl);
+  tf(a.headG, 0, -262, 1, headTilt);
+  a.body.setAttribute('transform', `translate(0 ${(-bob).toFixed(1)}) rotate(${tilt.toFixed(2)} 0 -130) scale(${(1 / Math.sqrt(sq)).toFixed(4)} ${sq.toFixed(4)})`);
+}
+// face: open 0..1 (eyelid), wide (bigger eyes), happy (arc eyes), mouth 0..1, worry (-1 angry .. 1 worried), lookX/Y
+function face(a, { open = 1, wide = 0, happy = 0, mouth = 0.15, worry = 0, lookX = 0, lookY = 0 } = {}) {
+  a.eyes.forEach(({ e, x }) => { show(e, happy < 0.5); tf(e, x + lookX, lookY, 1 + 0.35 * wide, 0, (1 + 0.35 * wide) * Math.max(0.08, open)); });
+  a.happy.forEach(h => show(h, happy >= 0.5));
+  a.brows.forEach((b, i) => { const s = i ? -1 : 1; show(b, Math.abs(worry) > 0.05); tf(b, 0, -wide * 6, 1, s * worry * 18); });
+  a.mouth.setAttribute('ry', (2 + mouth * 14).toFixed(1)); a.mouth.setAttribute('rx', (8 + mouth * 4).toFixed(1));
+}
+const blinkAt = (t, ts) => ts.some(b => t >= b && t < b + 0.12) ? 0.1 : 1;
+const squash = (t, t0, k = 0.35) => t < t0 ? 1 : 1 - k * Math.exp(-(t - t0) * 7) * Math.cos((t - t0) * 21);
+
+// giant halftone-filled numeral (flat fill + darker dots clipped to the glyph)
+let clipN = 0;
+function bigNum(parent, str, { x, y, size, fill, dot, angle = 20, step = 22, family = F.disp }) {
+  const id = 'numclip' + (clipN++);
+  const cp = el('clipPath', { id }, parent);
+  const a = { x, y, 'font-size': size, 'font-family': family, 'font-weight': 900 };
+  const ct = txt(cp, str, a);
+  const g = el('g', {}, parent);
+  const ft = txt(g, str, { ...a, fill });
+  const h = halftone(g, { color: dot, step, angle, f: (xx, yy) => 0.35 + 0.5 * clamp((yy - (y - size * 0.7)) / (size * 0.8)), maxK: 0.7 });
+  h.setAttribute('clip-path', `url(#${id})`); h.setAttribute('class', 'mul');
+  return { g, set: (s) => { ct.textContent = s; ft.textContent = s; } };
+}
+// a small ink chip under a stamp ("ПРОДЕРЖАЛСЯ", "РЕКОРД")
+function chip(parent, str, fill = C.navy, ink = C.cream, size = 34) {
+  const g = el('g', {}, parent);
+  const w = measure(str, size, F.mono, 800) + 36;
+  el('rect', { x: -w / 2 + 6, y: -size * 0.85 + 6, width: w, height: size * 1.5, rx: 8, fill: C.teal, class: 'mul' }, g);
+  el('rect', { x: -w / 2, y: -size * 0.85, width: w, height: size * 1.5, rx: 8, fill }, g);
+  txt(g, str, { x: 0, y: size * 0.32, 'font-size': size, 'font-family': F.mono, 'font-weight': 800, fill: ink, 'text-anchor': 'middle' });
+  return g;
+}
+const chipAnim = (g, t, t0, x, y, r = 0) => { if (t < t0) { op(g, 0); return; } op(g, 1); tf(g, x, y, E.back(seg(t, t0, t0 + 0.3)), r); };
+// a zoom group for camera pushes/pulls inside one scene
+function zoomG(parent) { return el('g', {}, parent); }
+const zoom = (g, s, cx = 960, cy = 540) => g.setAttribute('transform', `translate(${cx} ${cy}) scale(${s.toFixed(4)}) translate(${-cx} ${-cy})`);
+
+// the teleport bracelet as an exhibit (opening and ending)
+function braceletProp(parent) {
+  const g = el('g', {}, parent);
+  const inner = el('g', { filter: 'url(#boil)' }, g);
+  el('rect', { x: -330, y: -62, width: 660, height: 124, rx: 62, fill: C.teal, stroke: C.cream, 'stroke-width': LW }, inner);
+  for (let i = -5; i <= 5; i++) if (Math.abs(i) > 1) el('line', { x1: i * 52, y1: -40, x2: i * 52, y2: 40, stroke: C.night, 'stroke-width': 5, 'stroke-linecap': 'round' }, inner);
+  el('circle', { cx: 0, cy: 0, r: 132, fill: C.navy, stroke: C.cream, 'stroke-width': LW }, inner);
+  el('circle', { cx: 0, cy: 0, r: 104, fill: 'none', stroke: C.cream, 'stroke-width': 3, 'stroke-dasharray': '6 10' }, g);
+  const read = txt(g, '0,1 С', { x: 0, y: 22, 'font-size': 64, 'font-family': F.disp, 'font-weight': 900, fill: C.red, 'text-anchor': 'middle' });
+  const lab = txt(g, 'ТЕЛЕПОРТ', { x: 0, y: 70, 'font-size': 22, 'font-family': F.mono, 'font-weight': 800, fill: C.cream, 'text-anchor': 'middle' });
+  const tag = el('g', {}, g);                       // evidence tag on a string
+  el('path', { d: 'M250 40 Q300 160 360 190', stroke: C.cream, 'stroke-width': 4, fill: 'none' }, tag);
+  el('rect', { x: 330, y: 170, width: 230, height: 96, rx: 10, fill: C.paper, stroke: C.navy, 'stroke-width': 5, transform: 'rotate(8 445 218)' }, tag);
+  txt(tag, 'ВЕЩДОК № 0', { x: 445, y: 230, 'font-size': 28, 'font-family': F.mono, 'font-weight': 800, fill: C.navy, 'text-anchor': 'middle', transform: 'rotate(8 445 218)' });
+  return { g, read, lab };
+}
+
+// text registry for readcheck (TEXTS): every headline / caption with its window and box
+const TXT = [];
+const reg = (id, text, t0, t1, x0, y0, x1, y1) => TXT.push({ id, text, t0, t1, x0, y0, x1, y1 });
+window.TEXTS = (t) => TXT.filter(r => t >= r.t0 && t < r.t1).map(({ id, text, x0, y0, x1, y1 }) => ({ id, text, x0, y0, x1, y1 }));
+function headline(g, str, t0, t1, { x = 110, y = 250, size = 132, fill = C.navy, shadow = C.teal } = {}) {
+  const c = chars(g, str, { x, y, size, family: F.serif, fill, shadow: { fill: shadow, dx: 8, dy: 8 } });
+  reg('h' + t0, str, t0, t1, x, y - size, x + c.total, y + size * 0.3);
+  return c;
+}
+function cap(g, parts, t0, t1, o) {
+  const c = caption(g, parts, o);
+  const s = parts.map(p => p[0]).join('');
+  const w = measure(s, 46, F.sans, 900);
+  reg('c' + t0, s, t0, t1, 960 - w / 2 - 34, 940, 960 + w / 2 + 34, 1020);
+  return c;
+}
+
+// ============================================================
+// stage
+// ============================================================
+const world = document.getElementById('world');
+const cam = document.getElementById('cam');
+const hud = document.getElementById('hud');
+const wipe = document.getElementById('wipe');
+const flash = document.getElementById('flash');
+const fade = document.getElementById('fade');
+const scenes = [];
+function scene(t0, t1, build) {
+  const g = el('g', {}, world);
+  const s = { g, t0, t1 };
+  s.update = build(g, s);
+  scenes.push(s);
+  return s;
+}
+
+function buildAll() {
+  // ---------------- S1 hook 0–5: the evidence bag ----------------
+  scene(0, 5, (g) => {
+    bg(g, C.night);
+    halftone(g, { color: C.night2, step: 24, angle: 25, f: edge(820, 1.4), maxK: 0.7 });
+    const z = zoomG(g);
+    const num = bigNum(z, '40', { x: 640, y: 1010, size: 760, fill: C.red, dot: C.navy, angle: 30 });
+    const br = braceletProp(z);
+    const h1 = headline(g, 'У ТЕБЯ 40 СЕКУНД', 0.3, 5, { size: 112, fill: C.cream, y: 240 });
+    const c1 = cap(g, [['Телепорт спасёт за '], ['0,1 с', C.yellow], [' до смерти']], 1.2, 5);
+    return (t) => {
+      zoom(z, lerp(1, 1.06, E.io(seg(t, 0, 5))));
+      num.set(String(40 - Math.floor(t)));
+      tf(br.g, 1180, lerp(1300, 590, E.back(seg(t, 0, 0.45))) + Math.sin(t * 2.2) * 6, 1, -6);
+      br.read.setAttribute('fill', Math.floor(t * 2) % 2 ? C.yellow : C.red);
+      charsPop(h1, t, 0.3, 0.05);
+      captionAnim(c1, t, 1.2);
+    };
+  });
+
+  // ---------------- S2 the file: mugshot 5–9 ----------------
+  scene(5, 9, (g) => {
+    bg(g, C.paper);
+    halftone(g, { color: C.teal, step: 22, angle: 15, f: radial(1300, 560, 560, 1.1), maxK: 0.66 }).setAttribute('class', 'mul');
+    const z = zoomG(g);
+    for (let i = 0; i <= 10; i++) {                        // height chart
+      const y = 860 - i * 62;
+      el('line', { x1: 960, y1: y, x2: i % 2 ? 1060 : 1120, y2: y, stroke: C.navy, 'stroke-width': i % 2 ? 4 : 7 }, z);
+      el('line', { x1: 1520, y1: y, x2: i % 2 ? 1620 : 1560, y2: y, stroke: C.navy, 'stroke-width': i % 2 ? 4 : 7 }, z);
+      if (!(i % 2)) txt(z, String(140 + i * 8), { x: 1650, y: y + 9, 'font-size': 26, 'font-family': F.mono, 'font-weight': 800, fill: C.navy });
+    }
+    const aG = el('g', {}, z); const a = astro(aG);
+    const plate = el('g', {}, g);
+    el('rect', { x: 0, y: 0, width: 560, height: 92, rx: 10, fill: C.navy }, plate);
+    txt(plate, 'ОБЪЕКТ: ТЫ', { x: 28, y: 64, 'font-size': 52, 'font-family': F.disp, 'font-weight': 900, fill: C.yellow });
+    const h1 = headline(g, 'ИСПЫТУЕМЫЙ', 5.3, 9, { y: 250 });
+    const c1 = cap(g, [['Цель: '], ['прожить дольше', C.yellow], [' в каждом мире']], 6.2, 9);
+    const drop = el('path', { d: 'M0 -18 Q12 0 0 10 Q-12 0 0 -18Z', fill: C.sky, stroke: C.navy, 'stroke-width': 4 }, z);
+    return (t) => {
+      zoom(z, lerp(1, 1.05, seg(t, 5, 9)), 1290, 600);
+      tf(aG, 1290, lerp(1400, 900, E.back(seg(t, 5.05, 5.5))), 1.32);
+      pose(a, { la: 10 + Math.sin(t * 2) * 2, ra: 10, bob: Math.sin(t * 3) * 3, headTilt: t > 7 ? 6 : 0 });
+      const squint = t >= 5.6 && t < 5.95;
+      face(a, { open: squint ? 0.15 : blinkAt(t, [7.4, 8.5]), wide: t > 7.9 ? 0.4 : 0, worry: t > 7.9 ? 0.8 : 0.3, mouth: t > 7.9 ? 0.4 : 0.1, lookX: t > 6.5 && t < 7.9 ? -6 : 0 });
+      const dp = seg(t, 7.95, 8.9);
+      show(drop, t > 7.95); tf(drop, 1290 + 120, 900 - 1.32 * 330 + dp * 120, 1.2);
+      tf(plate, lerp(-700, 110, E.back(seg(t, 5.7, 6.1))), 330);
+      charsPop(h1, t, 5.3, 0.06);
+      captionAnim(c1, t, 6.2);
+    };
+  });
+
+  // ---------------- S3 exhibit 01: Mercury 9–15 ----------------
+  scene(9, 15, (g) => {
+    bg(g, C.paper);
+    const lineX = (t) => 960 + 18 * (t - 9);
+    const hot = el('rect', { x: 0, y: 0, width: 960, height: 1080, fill: C.yellow }, g);
+    const cold = el('rect', { x: 960, y: 0, width: 960, height: 1080, fill: C.sky }, g);
+    const hotDots = el('g', {}, g), coldDots = el('g', {}, g);
+    halftone(hotDots, { color: C.red, step: 24, angle: 15, f: (x) => Math.pow(clamp((960 - x) / 960), 0.7) * 1.1, maxK: 0.7 }).setAttribute('class', 'mul');
+    halftone(coldDots, { color: C.navy, step: 24, angle: 75, f: (x) => Math.pow(clamp((x - 960) / 960), 0.8) * 0.9, maxK: 0.66 }).setAttribute('class', 'mul');
+    const num = bigNum(g, '1', { x: 1580, y: 1230, size: 640, fill: C.teal, dot: C.navy, angle: 40 });
+    const term = el('line', { x1: 0, y1: 0, x2: 0, y2: 1080, stroke: C.navy, 'stroke-width': 10, 'stroke-dasharray': '30 18' }, g);
+    const lHot = chars(g, '+430°', { x: 120, y: 640, size: 120, family: F.disp, fill: C.red, shadow: { fill: C.navy, dx: 7, dy: 7 } });
+    const lCold = chars(g, '−180°', { x: 1820, y: 640, size: 120, family: F.disp, fill: C.navy, anchor: 'end', shadow: { fill: C.teal, dx: 7, dy: 7 } });
+    const aG = el('g', {}, g); const a = astro(aG);
+    const puffs = [0, 1, 2].map(() => el('circle', { r: 16, fill: C.cream, stroke: C.navy, 'stroke-width': 5 }, g));
+    const h1 = headline(g, 'МЕРКУРИЙ', 9.3, 15, { y: 250 });
+    const c1 = cap(g, [['Слева '], ['+430°', C.yellow], [', справа −180°']], 9.9, 15);
+    const st = stampEl(g, '2:03', { size: 150, color: C.red, family: F.disp });
+    const ch = chip(g, 'ПРОДЕРЖАЛСЯ');
+    return (t) => {
+      const x = lineX(t);
+      hot.setAttribute('width', x); cold.setAttribute('x', x); cold.setAttribute('width', 1920 - x);
+      hotDots.setAttribute('transform', `translate(${x - 960} 0)`); coldDots.setAttribute('transform', `translate(${x - 960} 0)`);
+      term.setAttribute('transform', `translate(${x} 0)`);
+      const slip = seg(t, 12.75, 13.0);
+      const wob = Math.sin(t * 3.1) * 7 + Math.sin(t * 7.3) * 2;
+      tf(aG, x, 900, 1.1);
+      pose(a, { la: 82 + Math.sin(t * 4) * 8 - slip * 40, ra: 84 - Math.sin(t * 4) * 8, ll: 4, rl: 34 + Math.sin(t * 2.5) * 10, tilt: wob - slip * 22 });
+      face(a, { wide: t > 12.85 ? 1 : 0.2, worry: 0.8, mouth: t > 12.85 ? 0.9 : 0.25, lookX: Math.sin(t * 1.7) * 7, open: blinkAt(t, [10.8]) });
+      puffs.forEach((p, i) => { const k = ((t * 0.9 + i / 3) % 1); tf(p, x - 40 - k * 40, 880 - k * 160, 0.6 + k); op(p, 1 - k); });
+      charsPop(h1, t, 9.3, 0.06);
+      charsPop(lHot, t, 9.6, 0.05); charsPop(lCold, t, 9.8, 0.05);
+      captionAnim(c1, t, 9.9);
+      chipAnim(ch, t, 12.8, 1440, 230, -4);
+      stampAnim(st, t, 13.0, 1440, 360, -8);
+    };
+  });
+
+  // ---------------- S4 exhibit 02: Venus 15–20.5 ----------------
+  scene(15, 20.5, (g) => {
+    bg(g, C.yellow);
+    halftone(g, { color: C.red, step: 22, angle: 15, f: (x, y) => 0.95 - y / 1300, maxK: 0.68 }).setAttribute('class', 'mul');
+    halftone(g, { color: C.teal, step: 26, angle: 70, f: radial(1700, 1080, 700, 1.2), maxK: 0.6 }).setAttribute('class', 'mul');
+    bigNum(g, '2', { x: 1430, y: 1040, size: 760, fill: C.red, dot: C.navy, angle: 30 });
+    el('rect', { x: 0, y: 900, width: 1920, height: 180, fill: C.red }, g);
+    halftone(g, { y0: 900, h: 180, color: C.navy, step: 20, angle: 45, f: () => 0.55, maxK: 0.6 }).setAttribute('class', 'mul');
+    const aG = el('g', {}, g); const a = astro(aG);
+    const wt = el('g', {}, g);
+    const wti = el('g', { filter: 'url(#boil)' }, wt);
+    el('path', { d: 'M-190 0 L-140 -230 L140 -230 L190 0Z', fill: C.navy, stroke: C.navy, 'stroke-width': LW, 'stroke-linejoin': 'round' }, wti);
+    el('path', { d: 'M-60 -230 Q0 -320 60 -230', fill: 'none', stroke: C.navy, 'stroke-width': 26 }, wti);
+    txt(wt, '92 АТМ', { x: 0, y: -85, 'font-size': 66, 'font-family': F.disp, 'font-weight': 900, fill: C.yellow, 'text-anchor': 'middle' });
+    const h1 = headline(g, 'ВЕНЕРА', 15.3, 20.5, { y: 250 });
+    const c1 = cap(g, [['Давление '], ['в 92 раза', C.yellow], [' выше земного']], 16.0, 20.5);
+    const st = stampEl(g, '0:30', { size: 150, color: C.red, family: F.disp });
+    const ch = chip(g, 'ШАГ НАЗАД', C.red, C.cream);
+    return (t) => {
+      const hitT = 17.0, flat = t >= hitT;
+      tf(aG, 1130, 905, 1.1);
+      const sq = flat ? lerp(0.22, 0.3, Math.exp(-(t - hitT) * 6) * Math.abs(Math.cos((t - hitT) * 20))) : 1;
+      pose(a, { la: flat ? 70 : 20 + (t > 16.4 ? 40 : 0), ra: flat ? 70 : 20 + (t > 16.4 ? 40 : 0), ll: flat ? 50 : 6, rl: flat ? 50 : 6, sq, tilt: 0 });
+      face(a, { wide: t > 16.4 ? 1 : 0.2, worry: t > 16.4 ? 1 : 0.4, mouth: t > 16.4 ? 1 : 0.2, lookY: t > 16.4 && !flat ? -8 : 0, open: blinkAt(t, [15.8]) });
+      const wy = flat ? 905 - 330 * 1.1 * sq + 6 : lerp(-300, 905 - 330 * 1.1, E.in(seg(t, 16.6, hitT)));
+      const lift = flat ? E.out(seg(t, 17.35, 17.8)) : 0;
+      tf(wt, 1130 + lift * 150, wy - lift * 260, 1.1, lift * 14);
+      charsPop(h1, t, 15.3, 0.07);
+      captionAnim(c1, t, 16.0);
+      stampAnim(st, t, 19.0, 520, 580, 7);
+      chipAnim(ch, t, 19.25, 520, 740, 3);
+    };
+  });
+
+  // ---------------- S5 exhibit 03: Neptune 20.5–25.5 (dark ink) ----------------
+  scene(20.5, 25.5, (g) => {
+    bg(g, C.night);
+    halftone(g, { color: C.night2, step: 24, angle: 20, f: edge(760, 1.3), maxK: 0.7 });
+    bigNum(g, '3', { x: 1380, y: 1040, size: 760, fill: C.night2, dot: C.sky, angle: 35 });
+    const streaks = el('g', {}, g);
+    const sr = rng(5);
+    const S = Array.from({ length: 26 }, () => ({ y: 120 + sr() * 840, len: 120 + sr() * 360, sp: 1700 + sr() * 1500, o: sr() * 2400, w: 6 + sr() * 10, c: sr() > 0.6 ? C.sky : C.cream }));
+    const sEls = S.map(s => el('rect', { y: s.y, height: s.w, width: s.len, rx: s.w / 2, fill: s.c }, streaks));
+    const aG = el('g', {}, g); const a = astro(aG);
+    const h1 = headline(g, 'НЕПТУН', 20.8, 25.5, { y: 250, fill: C.cream });
+    const c1 = cap(g, [['Ветер '], ['2100 км/ч', C.yellow]], 21.4, 25.5);
+    const st = stampEl(g, '0:05', { size: 150, color: C.red, family: F.disp });
+    const ch = chip(g, 'ХУДШИЙ', C.red, C.cream);
+    return (t) => {
+      S.forEach((s, i) => { const x = ((s.o + (t - 20.5) * s.sp) % 2600) - 500; sEls[i].setAttribute('x', x.toFixed(1)); });
+      const p = seg(t, 20.7, 23.9);
+      tf(aG, lerp(-250, 2150, E.io(p)), 620 + Math.sin(p * 9) * 120 + 180, 1.0, p * 900);
+      pose(a, { la: 120 + Math.sin(t * 13) * 30, ra: 120 + Math.cos(t * 11) * 30, ll: 30 + Math.sin(t * 15) * 25, rl: 30 + Math.cos(t * 12) * 25 });
+      face(a, { wide: 1, worry: 1, mouth: 1 });
+      charsPop(h1, t, 20.8, 0.07);
+      captionAnim(c1, t, 21.4);
+      stampAnim(st, t, 24.0, 1180, 560, -6);
+      chipAnim(ch, t, 24.25, 1180, 720, -3);
+    };
+  });
+
+  // ---------------- S6 exhibit 04: Titan 25.5–33 (the breath) ----------------
+  scene(25.5, 33, (g) => {
+    bg(g, C.paper);
+    const bloom = el('g', {}, g);
+    const sat = el('g', {}, g);
+    el('circle', { cx: 0, cy: 0, r: 70, fill: C.yellow, stroke: C.navy, 'stroke-width': LW }, sat);
+    el('ellipse', { cx: 0, cy: 0, rx: 130, ry: 30, fill: 'none', stroke: C.navy, 'stroke-width': LW, transform: 'rotate(-14)' }, sat);
+    bigNum(g, '4', { x: 120, y: 1000, size: 700, fill: C.teal, dot: C.navy, angle: 25 });
+    el('path', { d: 'M0 860 Q300 820 620 850 T1300 840 T1920 850 L1920 1080 L0 1080Z', fill: C.navy }, g);
+    halftone(g, { y0: 830, h: 250, color: C.sky, step: 22, angle: 60, f: (x, y) => 0.25 + 0.5 * Math.abs(Math.sin(x / 140)) * clamp((y - 850) / 200), maxK: 0.6 });
+    txt(g, 'МЕТАН', { x: 1560, y: 1000, 'font-size': 34, 'font-family': F.mono, 'font-weight': 800, fill: C.cream });
+    const aG = el('g', {}, g); const a = astro(aG, { wings: true });
+    const h1 = headline(g, 'ТИТАН', 25.8, 33, { y: 250 });
+    const c1 = cap(g, [['Гравитация слабее '], ['в 7 раз', C.yellow], [': ты летишь']], 26.5, 33);
+    const st = stampEl(g, '6:00:00', { size: 130, color: C.red, family: F.disp });
+    const ch = chip(g, 'РЕКОРД', C.yellow, C.navy);
+    let bloomPath = null;
+    return (t) => {
+      const k = seg(t, 25.5, 33);
+      while (bloom.firstChild) bloom.removeChild(bloom.firstChild);
+      const p = seg(t, 26.0, 32.6), x = lerp(520, 1500, E.io(p)), y = 540 - Math.sin(p * Math.PI) * 90 + Math.sin(t * 2.4) * 30;
+      halftone(bloom, { color: C.yellow, step: 24, angle: 15, f: radial(x, y, 300 + 260 * k, 1.0), maxK: 0.7 }).setAttribute('class', 'mul');
+      tf(sat, 1640, 230 + Math.sin(t) * 6, 1, 0);
+      const flap = Math.sin(t * 7);
+      tf(aG, x, y + 330, 0.95, Math.sin(t * 2.4) * 6);
+      pose(a, { la: 70 + flap * 35, ra: 70 + flap * 35, ll: 10, rl: 24, tilt: -8, bob: 0 });
+      face(a, { happy: t > 26.8 ? 1 : 0, mouth: 0.6, wide: t < 26.8 ? 0.6 : 0 });
+      charsPop(h1, t, 25.8, 0.08);
+      captionAnim(c1, t, 26.5);
+      stampAnim(st, t, 31.0, 560, 560, -6);
+      chipAnim(ch, t, 31.25, 560, 710, -3);
+    };
+  });
+
+  // ---------------- S7 exhibit 05: Mars 33–38 (tension, then silence) ----------------
+  scene(33, 38, (g) => {
+    bg(g, C.red);
+    const z = zoomG(g);
+    halftone(z, { color: C.yellow, step: 24, angle: 15, f: radial(700, 300, 900, 1.3), maxK: 0.55 }).setAttribute('class', 'mul');
+    el('path', { d: 'M0 820 Q480 780 960 810 T1920 800 L1920 1080 L0 1080Z', fill: C.navy }, z);
+    halftone(z, { y0: 790, h: 290, color: C.red, step: 20, angle: 45, f: () => 0.5, maxK: 0.6 });
+    const dust = el('g', {}, z);
+    const dr = rng(9); const D = Array.from({ length: 40 }, () => ({ y: dr() * 1080, s: 4 + dr() * 10, sp: 300 + dr() * 700, o: dr() * 2200 }));
+    const dEls = D.map(d => el('circle', { r: d.s, fill: C.yellow }, dust));
+    const aG = el('g', {}, z); const a = astro(aG);
+    const crowd = el('g', {}, g);
+    const o2 = el('g', {}, g);
+    txt(o2, 'КИСЛОРОД', { x: 0, y: 0, 'font-size': 28, 'font-family': F.mono, 'font-weight': 800, fill: C.cream });
+    el('rect', { x: 0, y: 14, width: 300, height: 30, rx: 8, fill: 'none', stroke: C.cream, 'stroke-width': 5 }, o2);
+    const o2v = txt(o2, '0 %', { x: 320, y: 40, 'font-size': 34, 'font-family': F.disp, 'font-weight': 900, fill: C.yellow });
+    const h1 = headline(g, 'МАРС', 33.3, 38, { y: 250, fill: C.cream, shadow: C.navy });
+    const c1 = cap(g, [['Кислород: '], ['0 %', C.yellow]], 33.9, 36.9);
+    const hand = el('g', {}, z);
+    const hi = el('g', { filter: 'url(#boil)' }, hand);
+    el('rect', { x: 0, y: -40, width: 900, height: 80, rx: 40, fill: C.cream, stroke: C.navy, 'stroke-width': LW }, hi);
+    el('circle', { cx: 0, cy: 0, r: 52, fill: C.cream, stroke: C.navy, 'stroke-width': LW }, hi);
+    el('rect', { x: 120, y: -48, width: 40, height: 96, rx: 10, fill: C.teal, stroke: C.navy, 'stroke-width': 5 }, hi);
+    return (t) => {
+      zoom(z, lerp(1, 1.08, E.in(seg(t, 33, 37.4))), 960, 700);
+      D.forEach((d, i) => { const x = ((d.o + (t - 33) * d.sp) % 2200) - 140; dEls[i].setAttribute('cx', x.toFixed(1)); dEls[i].setAttribute('cy', (d.y + Math.sin(t * 2 + i) * 20).toFixed(1)); });
+      tf(aG, 960, 860, 1.15);
+      const sag = seg(t, 33, 35);
+      pose(a, { la: 30, ra: 30, ll: 60, rl: 60, sq: lerp(1, 0.86, sag), tilt: 6 * sag, headTilt: -10 * sag });
+      face(a, { open: lerp(1, 0.45, seg(t, 35, 37.3)), worry: 1, mouth: 0.25, lookY: 6 });
+      const lightOn = t < 36.4 ? Math.floor(t * 4) % 2 === 0 : false;
+      a.armL.j.light.setAttribute('fill', lightOn ? C.yellow : C.navy);
+      while (crowd.firstChild) crowd.removeChild(crowd.firstChild);
+      const close = seg(t, 35.2, 37.4);
+      halftone(crowd, { color: C.night, step: 26, angle: 20, f: edge(lerp(900, 380, close), 1.2), maxK: 0.74 });
+      tf(o2, 1450, 160); op(o2v, Math.floor(t * 3) % 2 ? 0.35 : 1);
+      show(hand, t >= 37.2); tf(hand, lerp(1960, 1060, E.out(seg(t, 37.2, 37.75))), 700, 1, -12);
+      charsPop(h1, t, 33.3, 0.08);
+      captionAnim(c1, t, 33.9);
+      if (t >= 36.6) op(c1.g, 1 - seg(t, 36.6, 36.9));
+    };
+  });
+
+  // ---------------- S8 the turn: Mars 2090, pull back 38–43 ----------------
+  scene(38, 42.5, (g) => {
+    bg(g, C.paper);
+    const z = zoomG(g);
+    const bloom = el('g', {}, z);
+    el('rect', { x: -400, y: 900, width: 2720, height: 600, fill: C.red }, z);
+    halftone(z, { x0: -400, y0: 900, w: 2720, h: 400, color: C.navy, step: 22, angle: 45, f: () => 0.35, maxK: 0.6 }).setAttribute('class', 'mul');
+    const domeD = 'M260 905 A700 640 0 0 1 1660 905Z';
+    el('path', { d: domeD, fill: C.sky, stroke: C.navy, 'stroke-width': 12 }, z);
+    const dc = el('clipPath', { id: 'domeclip' }, z); el('path', { d: domeD }, dc);
+    const dh = halftone(z, { x0: 260, y0: 260, w: 1400, h: 650, color: C.teal, step: 22, angle: 15, f: (x, y) => clamp(Math.hypot((x - 960) / 700, (y - 905) / 640) * 1.1 - 0.4), maxK: 0.6 });
+    dh.setAttribute('class', 'mul'); dh.setAttribute('clip-path', 'url(#domeclip)');
+    const br = rng(4);
+    [[460, 220], [600, 330], [760, 260], [1150, 300], [1310, 380], [1480, 210]].forEach(([x, h]) => {
+      el('rect', { x: x - 55, y: 905 - h, width: 110, height: h, fill: C.paper, stroke: C.navy, 'stroke-width': LW }, z);
+      for (let wy = 905 - h + 30; wy < 880; wy += 50) for (const wx of [-25, 15]) el('rect', { x: x + wx, y: wy, width: 18, height: 24, fill: br() > 0.3 ? C.yellow : C.navy }, z);
+    });
+    for (let i = 0; i < 9; i++) el('path', { d: `M${960 + Math.cos(Math.PI + i * Math.PI / 8) * 700} ${905 + Math.sin(Math.PI + i * Math.PI / 8) * 640} L960 905`, stroke: C.navy, 'stroke-width': 3, opacity: 0.35 }, z);
+    const aG = el('g', {}, z); const a = astro(aG);
+    const h1 = headline(g, 'МАРС · 2090', 38.6, 42.5, { y: 250 });
+    const c1 = cap(g, [['Первый '], ['город людей', C.yellow], [' под куполом']], 39.2, 42.5);
+    const inf = el('g', {}, g);
+    const ii = el('g', { filter: 'url(#stampInk)' }, inf);
+    el('path', { d: 'M0 0 C-40 -70 -150 -70 -150 0 C-150 70 -40 70 0 0 C40 -70 150 -70 150 0 C150 70 40 70 0 0Z', fill: 'none', stroke: C.red, 'stroke-width': 30, 'stroke-linejoin': 'round' }, ii);
+    const st = stampEl(g, 'ВЫЖИЛ', { size: 110, color: C.red });
+    return (t) => {
+      zoom(z, lerp(2.4, 1, E.io(seg(t, 38.2, 40.2))), 960, 700);
+      while (bloom.firstChild) bloom.removeChild(bloom.firstChild);
+      halftone(bloom, { x0: -400, y0: -400, w: 2720, h: 1500, color: C.yellow, step: 26, angle: 20, f: radial(960, 700, 300 + 900 * E.out(seg(t, 38, 41.5)), 0.9), maxK: 0.7 }).setAttribute('class', 'mul');
+      tf(aG, 960, 890, 0.62);
+      const cheer = seg(t, 40.5, 40.9);
+      pose(a, { la: lerp(20, 150, cheer), ra: lerp(20, 150, cheer), bob: Math.abs(Math.sin((t - 40.5) * 6)) * 14 * cheer });
+      face(a, { happy: t > 39.0 ? 1 : 0, open: t < 39 ? 0.6 : 1, mouth: t > 40.5 ? 0.8 : 0.3, wide: t < 39 ? 0.3 : 0 });
+      charsPop(h1, t, 38.6, 0.06);
+      captionAnim(c1, t, 39.2);
+      stampAnim({ g: inf }, t, 40.5, 1500, 380, -10);
+      stampAnim(st, t, 40.5, 1500, 540, -6);
+    };
+  });
+
+  // ---------------- S9 the archive: moral, the bracelet goes dark 43–50 ----------------
+  scene(42.5, 50, (g) => {
+    bg(g, C.night);
+    halftone(g, { color: C.night2, step: 24, angle: 25, f: edge(900, 1.5), maxK: 0.7 });
+    const br = braceletProp(g);
+    const h1 = headline(g, 'НИ ОДИН МИР', 42.8, 46.8, { y: 300, size: 104, fill: C.cream });
+    const h2 = headline(g, 'НЕ СОЗДАН ДЛЯ НАС', 43.2, 46.8, { y: 430, size: 104, fill: C.cream });
+    const h3 = headline(g, 'А СКОЛЬКО', 46.8, 50, { y: 300, size: 110, fill: C.cream, shadow: C.red });
+    const h4 = headline(g, 'ПРОДЕРЖИШЬСЯ ТЫ?', 47.1, 50, { y: 430, size: 110, fill: C.yellow, shadow: C.red });
+    const c1 = cap(g, [['Кроме того, '], ['что строим мы', C.yellow]], 43.5, 46.8);
+    return (t) => {
+      const lit = t < 47.0;
+      tf(br.g, 1360, lerp(1300, 780, E.back(seg(t, 42.6, 43.1))), 0.62, -6);
+      br.read.textContent = lit ? '0,1 С' : 'ВЫКЛ'; br.read.setAttribute('font-size', lit ? 64 : 46);
+      br.read.setAttribute('fill', lit ? (Math.floor(t * 2) % 2 ? C.yellow : C.red) : C.night2);
+      const first = t < 46.8;
+      show(h1.g, first); show(h2.g, first); show(h3.g, !first); show(h4.g, !first);
+      charsPop(h1, t, 42.8, 0.05); charsPop(h2, t, 43.2, 0.04);
+      charsPop(h3, t, 46.8, 0.05); charsPop(h4, t, 47.1, 0.04);
+      captionAnim(c1, t, 43.5); show(c1.g, first);
+    };
+  });
+
+  // ---------------- HUD ----------------
+  const hudG = el('g', {}, hud);
+  const caseNo = txt(hudG, 'ДЕЛО № SOL-08 · ВЫЖИВАНИЕ', { x: 60, y: 62, 'font-size': 22, 'font-family': F.mono, 'font-weight': 800 });
+  const chipG = el('g', {}, hudG);
+  const chipBg = el('rect', { x: 60, y: 76, height: 40, rx: 6 }, chipG);
+  const chipA = txt(chipG, '', { x: 74, y: 104, 'font-size': 24, 'font-family': F.sans, 'font-weight': 900 });
+  const chipB = txt(chipG, '', { y: 104, 'font-size': 24, 'font-family': F.sans, 'font-weight': 900 });
+  const date = el('g', {}, hudG);
+  const dateBg = el('rect', { x: 1660, y: 40, width: 200, height: 50, rx: 8, fill: 'none', 'stroke-width': 4 }, date);
+  const recDot = el('circle', { cx: 1686, cy: 65, r: 9, fill: C.red }, date);
+  const dateT = txt(date, 'ДЕНЬ 01', { x: 1706, y: 75, 'font-size': 28, 'font-family': F.mono, 'font-weight': 800 });
+  const chips = [
+    [0, 5, 'ПУСК', 'ТЕЛЕПОРТ'], [5, 9, 'ДЕЛО', 'ИСПЫТУЕМЫЙ'], [9, 15, 'ВЕЩДОК 01', 'МЕРКУРИЙ'], [15, 20.5, 'ВЕЩДОК 02', 'ВЕНЕРА'],
+    [20.5, 25.5, 'ВЕЩДОК 03', 'НЕПТУН'], [25.5, 33, 'ВЕЩДОК 04', 'ТИТАН'], [33, 38, 'ВЕЩДОК 05', 'МАРС'], [38, 42.5, 'ВЕЩДОК 05', 'МАРС · 2090'], [42.5, 50, 'ИТОГ', 'В АРХИВ'],
+  ];
+  hudUpdate = (t) => {
+    const c = chips.find(c => t >= c[0] && t < c[1]);
+    show(hudG, !!c);
+    if (!c) return;
+    const dark = t < 5 || (t >= 20.5 && t < 25.5) || (t >= 33 && t < 38) || t >= 42.5;
+    const ink = dark ? C.cream : C.navy;
+    caseNo.setAttribute('fill', ink);
+    chipBg.setAttribute('fill', dark ? C.cream : C.navy);
+    chipA.textContent = c[2]; chipA.setAttribute('fill', dark ? C.red : C.yellow);
+    chipB.textContent = c[3]; chipB.setAttribute('fill', dark ? C.navy : C.cream);
+    const wa = measure(c[2], 24, F.sans), wb = measure(c[3], 24, F.sans);
+    chipB.setAttribute('x', 74 + wa + 14);
+    chipBg.setAttribute('width', wa + wb + 42);
+    dateBg.setAttribute('stroke', ink); dateT.setAttribute('fill', ink);
+    op(recDot, Math.floor(t * 2) % 2 ? 0.25 : 1);
+  };
+
+  // ---------------- halftone-dot transition ----------------
+  const dotsG = el('g', {}, wipe);
+  const wipeDots = [];
+  for (let y = 0; y <= 1080 + 80; y += 80) for (let x = 0; x <= 1920 + 80; x += 80) {
+    wipeDots.push({ el: el('circle', { cx: x, cy: y, r: 0 }, dotsG), x, y });
+  }
+  const WIPES = [[5, C.teal], [9, C.yellow], [20.5, C.navy], [25.5, C.teal], [33, C.red], [42.5, C.teal]];
+  wipeUpdate = (t) => {
+    const w = WIPES.find(([b]) => Math.abs(t - b) < 0.22);
+    show(dotsG, !!w);
+    if (!w) return;
+    dotsG.setAttribute('fill', w[1]);
+    const u = (t - w[0] + 0.22) / 0.44;
+    wipeDots.forEach(d => {
+      const delay = (d.x / 1920 * 0.6 + d.y / 1080 * 0.4) * 0.35;
+      const p = clamp((u - delay) / 0.65);
+      d.el.setAttribute('r', (Math.min(1, Math.sin(p * Math.PI) * 1.6) * 62).toFixed(1));
+    });
+  };
+}
+let hudUpdate = () => {}, wipeUpdate = () => {};
+
+
+// ============================================================
+// paper & grain
+// ============================================================
+function buildPaper() {
+  const cv = document.getElementById('paper'), ctx = cv.getContext('2d');
+  const img = ctx.createImageData(1920, 1080);
+  const r = rng(3);
+  // low-frequency mottling
+  const small = document.createElement('canvas'); small.width = 96; small.height = 54;
+  const sctx = small.getContext('2d'); const sim = sctx.createImageData(96, 54);
+  for (let i = 0; i < sim.data.length; i += 4) { const v = 242 + r() * 13; sim.data[i] = sim.data[i + 1] = sim.data[i + 2] = v; sim.data[i + 3] = 255; }
+  sctx.putImageData(sim, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(small, 0, 0, 1920, 1080);
+  const base = ctx.getImageData(0, 0, 1920, 1080);
+  for (let i = 0; i < base.data.length; i += 4) {
+    const n = (r() - 0.5) * 26;
+    base.data[i] = clamp(base.data[i] + n, 0, 255);
+    base.data[i + 1] = clamp(base.data[i + 1] + n, 0, 255);
+    base.data[i + 2] = clamp(base.data[i + 2] + n - 4, 0, 255);
+  }
+  ctx.putImageData(base, 0, 0);
+  // vignette
+  const gr = ctx.createRadialGradient(960, 540, 400, 960, 540, 1150);
+  gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(120,100,80,0.35)');
+  ctx.fillStyle = gr; ctx.fillRect(0, 0, 1920, 1080);
+  // fold creases
+  ctx.strokeStyle = 'rgba(140,120,100,0.18)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(960, 0); ctx.lineTo(962, 1080); ctx.stroke();
+}
+function drawFx(frame) {
+  const cv = document.getElementById('fx'), ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, 1920, 1080);
+  const r = rng(1000 + Math.floor(frame / 2));
+  ctx.fillStyle = 'rgba(255,248,235,0.75)';
+  for (let i = 0; i < 520; i++) {
+    const x = r() * 1920, y = r() * 1080, s = 0.6 + r() * 1.8;
+    ctx.beginPath(); ctx.arc(x, y, s, 0, 7); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(29,35,64,0.25)';
+  for (let i = 0; i < 90; i++) { ctx.beginPath(); ctx.arc(r() * 1920, r() * 1080, 0.6 + r() * 1.3, 0, 7); ctx.fill(); }
+}
+
+// ============================================================
+// render
+// ============================================================
+const SHAKES = [[13.0, 16, 0.3], [17.0, 24, 0.4], [19.0, 12, 0.3], [24.0, 14, 0.3], [31.0, 12, 0.3], [38.0, 10, 0.3], [40.5, 26, 0.45]];
+const boilT = document.getElementById('boilT');
+function render(t) {
+  const frame = Math.round(t * FPS);
+  boilT.setAttribute('seed', 1 + (Math.floor(t * 10) % 40));
+  for (const s of scenes) {
+    const on = t >= s.t0 && t < s.t1;
+    show(s.g, on);
+    if (on) s.update(t);
+  }
+  // camera: shake + drum-hit pulse
+  let dx = 0, dy = 0;
+  for (const [t0, a, d] of SHAKES) {
+    if (t >= t0 && t < t0 + d) { const k = 1 - (t - t0) / d; dx += a * k * k * Math.sin(t * 91 + t0); dy += a * k * k * Math.cos(t * 77 + t0 * 3); }
+  }
+  const inGroove = (t >= 5 && t < 25.5) || (t >= 41 && t < 42.5);
+  const pulse = inGroove ? 1 + 0.006 * Math.exp(-((t % 0.5) / 0.07)) : 1;
+  cam.setAttribute('transform', `translate(${(dx + 960 * (1 - pulse)).toFixed(2)} ${(dy + 540 * (1 - pulse)).toFixed(2)}) scale(${pulse.toFixed(4)})`);
+  // camera flash
+  let fl = 0;
+  for (const f of [5.6]) if (t >= f && t < f + 0.3) fl = Math.max(fl, 0.95 * Math.pow(1 - (t - f) / 0.3, 2));
+  for (const f of [38.0, 40.5]) if (t >= f && t < f + 0.14) fl = Math.max(fl, 0.5 * (1 - (t - f) / 0.14));
+  op(flash, fl);
+  op(fade, seg(t, 49.3, 49.95));
+  hudUpdate(t);
+  wipeUpdate(t);
+  drawFx(frame);
+}
+
+async function init() {
+  // preload every glyph used (Google Fonts splits by unicode-range)
+  const all = document.documentElement.innerHTML;
+  const fams = ['900 50px "Playfair Display"', '900 50px "Unbounded"', '800 50px "JetBrains Mono"', '900 50px "Rubik"', '800 50px "Rubik"', '400 50px "Neucha"'];
+  const sample = all.replace(/[\x00-\x2f]/g, '') + 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:·°−%?,.АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя№';
+  await Promise.all(fams.map(f => document.fonts.load(f, sample)));
+  await document.fonts.ready;
+  buildPaper();
+  buildAll();
+  // second pass: make sure glyphs for dynamic text are loaded too
+  const all2 = document.getElementById('stage').textContent;
+  await Promise.all(fams.map(f => document.fonts.load(f, all2)));
+  await document.fonts.ready;
+  const q = new URLSearchParams(location.search);
+  render(parseFloat(q.get('t') || '0'));
+  window.READY = true;
+}
+window.render = render;
+init();
+</script>
+</body>
+</html>

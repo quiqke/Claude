@@ -1,0 +1,12 @@
+«Сколько ты проживёшь» — тестовый ролик в стиле Halftone Dossier
+
+Шрифты (SIL Open Font License 1.1, Google Fonts, файлы в fonts/):
+- Playfair Display — Claus Eggers Sørensen — https://github.com/google/fonts/tree/main/ofl/playfairdisplay
+- Unbounded — NaN — https://github.com/google/fonts/tree/main/ofl/unbounded
+- Rubik — Hubert & Fischer, Meir Sadan, Cyreal — https://github.com/google/fonts/tree/main/ofl/rubik
+- JetBrains Mono — JetBrains — https://github.com/google/fonts/tree/main/ofl/jetbrainsmono
+- Neucha — Jovanny Lemonad — https://github.com/google/fonts/tree/main/ofl/neucha
+
+Звук: вся музыка и шумы синтезированы в коде (music.py), семплов и записей нет.
+Голос: нет.
+Изображения: всё нарисовано кодом (index.html), сторонних изображений нет.
