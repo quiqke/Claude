@@ -66,6 +66,13 @@ $PY $SK/cues.py <project>       # cues.json (karaoke pages, boxes, HUD, cards, a
 **Default style the user likes: «Мультфильм»** — `lighthouse-toon/js/toon.js` (thick boiling outline, flat colour, hard shadows, camera with constant line weight, expressive faces with `scream`, people with walk/kneel/sit/lying, soft light pools) + `world.js` sets (exterior, room, lantern room, stairs, courtyard, close-ups) + `film.js` scene list. Copy `toon.js` into a new project and write new sets/scenes the same way. Previous pixel version (rejected as a style, kept as code reference): `lighthouse-pixel/` (16-bit Pixel RPG on `$LIB/styles/pixel-rpg/demo` engine: indexed 320×180 framebuffer, Bayer fog, sprite rig with added `hero`/`vera`, in-world Cyrillic via Press Start 2P, step counter, party join/leave windows, palette fades/mosaic/shake). For another style, read `$LIB/styles/<style>/STYLE.md` and its demo engine, keep the same contract.
 Check: `node $LIB/core/render/still.mjs <project> <t…> --out <project>/out/stills` (full size; `--size` crops) + `sheet.py` contact sheet, one frame per scene, before the full render.
 
+### Retention editing (every video)
+- **A new shot every 3–5 s.** `tools/retention.js`: `makeCuts(cues, SEG)` puts cuts at caption-phrase starts (fills gaps every 4 s, never inside chapter cards); `shotFraming(...)` alternates base / close-up on the face / offset medium / wider, with a slow push-in and a 0.12 s whip at each cut. Scene-specific shots (screens, inserts, reveals) still override on their words.
+- **Kinetic words**: every red `**опасность**` word pops huge behind the captions for 0.7 s (`bigWords` + `drawBigWord`) with a low hit.
+- **Flash-forward in the hook**: 3 glimpses (0.35 s each, glitch + hit) of the strongest later images during the first 8 s.
+- Punch-in zoom + shake on `@danger ≥ 70`, white flash on hard cuts, portal/iris on chapter cards.
+- More ideas to use when the story allows: on-screen choice/poll before a twist («А ты бы открыл? ДА / НЕТ»), freeze-frame + «СТОП» + question, live countdown timer, mid-video «подпишись» pop at ~35 %, silence before a scare.
+
 ## 4. Sound
 ```
 (cd $LIB && node core/render/events.mjs <project>)     # page EV → events.json

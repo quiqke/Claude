@@ -1,7 +1,7 @@
 // film.js — «7 правил выживания на чужой планете»: scenes keyed to spoken words, a portal jump into every new zone.
 import * as T from './toon.js';
 import * as W from './world.js';
-let g, CU, SEG = [], EV = [], SH = [0, 0], PUNCH = [];
+let g, CU, SEG = [], EV = [], SH = [0, 0], PUNCH = [], CUTS = [], BIGW = [];
 const ev = (t, type, o = {}) => EV.push({ t: +(+t).toFixed(3), type, ...o });
 const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
 const ss = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
@@ -17,27 +17,45 @@ export async function init(cv, cues) {
   SEG.forEach((s, i) => { s.t1 = i + 1 < SEG.length ? SEG[i + 1].t0 : cues.total + .3; s.i = i; }); SEG[0].t0 = 0;
   SEG.forEach((s, i) => { if (s.scene === 'title') { s.next = SEG[i + 1]; s.n = SEG.slice(0, i + 1).filter(x => x.scene === 'title').length; } });
   PUNCH = (cues.fx || []).filter(e => e.type === 'danger' && e.value >= 70).map(e => e.t);
+  // retention cuts: a new framing every 3–5 s, preferably where a caption phrase starts
+  const pages = cues.pages.map(p => p.t0);
+  for (const sg of SEG) { if (sg.scene === 'title') continue; let last = sg.t0; const cand = pages.filter(x => x > sg.t0 + 1 && x < sg.t1 - 1).sort((a, b) => a - b);
+    for (const c of cand) { while (c - last > 5.2) { last += 4; CUTS.push(last); } if (c - last >= 3) { CUTS.push(c); last = c; } }
+    while (sg.t1 - last > 5.5) { last += 4; CUTS.push(last); } }
+  CUTS.sort((a, b) => a - b);
+  // big kinetic words: the first word of every red «опасность» group
+  for (const pg of cues.pages) { let pc = null; for (const w of pg.words) { if (w.c === 'danger' && pc !== 'danger') BIGW.push({ t: w.t0, w: w.w.replace(/[«»"“”.,:;!?—…]/g, '').toUpperCase() }); pc = w.c; } }
   for (const s of SEG) { if (s.scene === 'title') { ev(s.t0, 'whoosh'); ev(s.t0 + .1, 'portal'); } }
   for (const p of PUNCH) ev(p, 'hit', { v: .7 });
+  for (const ta of [2.3, 4.6, 6.8]) ev(ta, 'hit', { v: .45 });
   return { draw, EV };
 }
 const norm = w => w.toLowerCase().replace(/ё/g, 'е');
 function wt(seg, pat, nth = 0) { if (!seg) return null; let k = 0; const p = norm(pat); for (const l of seg.lines) for (const w of l.words) if (norm(w.w).startsWith(p)) { if (k++ === nth) return w.t0; } return null; }
 const after = (t, a) => a != null && t >= a;
-function cam(x = 960, y = 540, z = 1) { let pz = 0; for (const p of PUNCH) if (t_ >= p && t_ < p + .35) pz = .14 * (1 - (t_ - p) / .35); T.setCam(x, y, z * (1 + pz), SH[0], SH[1]); }
+function shotInfo(t) { const s = segAt(t); let k = 0, st = s.t0; for (const c of CUTS) { if (c <= s.t0) continue; if (c > t) break; k++; st = c; } return { k, st }; }
+function cam(x = 960, y = 540, z = 1, focus = null) {
+  let pz = 0; for (const p of PUNCH) if (t_ >= p && t_ < p + .35) pz = .14 * (1 - (t_ - p) / .35);
+  const { k, st } = shotInfo(t_), v = k % 4, p = clamp((t_ - st) / 5);
+  if (v === 1) { if (focus) { x = focus[0]; y = focus[1]; z = Math.max(z * 1.9, 2.2); } else { y -= 60; z *= 1.45; } }
+  else if (v === 2) { x += 170; y += 30; z *= 1.22; } else if (v === 3) { x -= 150; y -= 20; z *= .92; }
+  z = Math.min(3.2, z) * (1 + .05 * p); x += (k % 2 ? 30 : -30) * p;
+  const wp = t_ - st; let wx = 0; if (k > 0 && wp < .12) wx = (k % 2 ? 1 : -1) * 240 * (1 - wp / .12);
+  T.setCam(x, y, z * (1 + pz), SH[0] + wx, SH[1]);
+}
 let t_ = 0;
 
 // framing inside a long segment: the k-th spoken line picks wide / close-up / medium so the picture keeps moving
 function lineIdx(seg, t) { let k = 0; seg.lines.forEach((l, i) => { if (t >= l.t0 - .15) k = i; }); return k; }
 const HEAD_Y = 655;
-function frame(seg, t, hx, wide = [960, 560, 1]) { const k = lineIdx(seg, t), m = k % 3; if (k === 0 || m === 0) return cam(...wide); if (m === 1) return cam(hx, HEAD_Y, 2.4); return cam(hx + 120, 720, 1.5); }
+function frame(seg, t, hx, wide = [960, 560, 1]) { return cam(wide[0], wide[1], wide[2], [hx, HEAD_Y]); }
 const SC = {
   crash(t, s) {
     const scr = wt(s, 'экран'), out = wt(s, 'выбираешься'), mem = wt(s, 'последнее'), k = ss(s.t0, s.t1, t);
     if (scr != null && t >= scr - .2 && (out == null || t < out - .2)) { cam(); W.screen(g, t, ['! АТМОСФЕРА НЕПРИГОДНА', 'СВЯЗИ НЕТ', 'СПАСЕНИЕ НЕ ОЖИДАЕТСЯ'], { alarm: true, typed: t - scr }); return; }
     if (mem != null && t >= mem - .2) { const off = wt(s, 'погас'); cam(960, 540, 1 + .1 * ss(mem, s.t1, t)); W.flashback(g, t, { out: off != null && t >= off ? ss(off, off + 1, t) : 0 }); return; }
-    if (out != null && t >= out - .2) { cam(1000, 520, 1.1); W.crash(g, t, { hx: 520, face: { eyes: 'open', brow: 'up', look: [1, -1], mouth: .2 } }); return; }
-    cam(1000, 560, 1.25 - .2 * k); W.crash(g, t, { hx: 560 + 120 * k, face: { eyes: 'wide', brow: 'up', look: [1, 0], sweat: true, mouth: .3 } });
+    if (out != null && t >= out - .2) { cam(1000, 520, 1.1, [520, HEAD_Y]); W.crash(g, t, { hx: 520, face: { eyes: 'open', brow: 'up', look: [1, -1], mouth: .2 } }); return; }
+    cam(1000, 560, 1.25 - .2 * k, [560 + 120 * k, HEAD_Y]); W.crash(g, t, { hx: 560 + 120 * k, face: { eyes: 'wide', brow: 'up', look: [1, 0], sweat: true, mouth: .3 } });
   },
   scratches(t, s) {
     const hand = wt(s, 'твой') ?? s.t0 + 3, num = wt(s, 'сорок'), dec = wt(s, 'скафандр');
@@ -114,6 +132,9 @@ function shakeAt(t, t0, amp = 22) { const k = Math.floor((t - t0) * 24); if (k <
 function draw(t) {
   t_ = t; T.setTime(t); const s = segAt(t), f = SC[s.scene] || SC.crash;
   SH = [0, 0]; g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#000'; g.fillRect(0, 0, 1920, 1080);
+  // flash-forward teaser inside the hook: 0.35 s glimpses of what is coming, with a glitch
+  const TZ = [[2.3, () => { T.setCam(1460, 260, 2.2); W.desert(g, t, { eye: 1, lookX: -.2, hx: 880 }); }], [4.6, () => { T.setCam(900, 420, 1.5); W.ice(g, t, { call: .9 }); }], [6.8, () => { T.setCam(960, 600, .95); W.loopField(g, t, { n: 41, hero: false }); }]];
+  for (const [ta, fn] of TZ) if (t >= ta && t < ta + .35) { fn(); T.setCam(); T.tint(g, '#3df2ff', .12); for (let i = 0; i < 6; i++) { const y = (i * 173 + Math.floor(t * 24) * 61) % 1080; g.drawImage(g.canvas, 0, y, 1920, 40, (i % 2 ? 30 : -30), y, 1920, 40); } return; }
   let r = f(t, s) || {};
   if (r.shake != null && t > r.shake && t < r.shake + .4) { SH = shakeAt(t, r.shake); g.fillRect(0, 0, 1920, 1080); r = f(t, s) || {}; }
   T.setCam(); T.setRot(0);
@@ -122,5 +143,7 @@ function draw(t) {
   const ts = [...SEG].reverse().find(x => x.scene === 'title' && t >= x.t0 && t < x.t0 + 3.6);
   if (ts && ts.next) { const tag = `ЗОНА ${ts.n} · ${ZONE[ts.next.scene] || ''}`, n = Math.floor(clamp((t - ts.t0 - .25) * 34, 0, tag.length)), a = clamp((ts.t0 + 3.6 - t) / .3);
     if (n) { g.save(); g.globalAlpha = a; g.font = '800 46px JBMono'; g.textBaseline = 'middle'; const w = g.measureText(tag).width, y = 790; g.fillStyle = 'rgba(7,26,42,.85)'; g.fillRect(40, y - 36, w + 48, 72); g.strokeStyle = W.SCAN; g.lineWidth = 4; g.strokeRect(40, y - 36, w + 48, 72); g.fillStyle = W.SCAN; g.fillText(tag.slice(0, n) + (Math.floor(t * 4) % 2 ? '_' : ''), 64, y); g.restore(); } }
+  // kinetic words: a huge red word pops behind the captions on every «опасность» word
+  for (const b of BIGW) if (t >= b.t && t < b.t + .7 && s.scene !== 'title') { const p = (t - b.t) / .7, sc = p < .15 ? .6 + p / .15 * .5 : 1.1 - .1 * p; g.save(); g.globalAlpha = p > .75 ? (1 - p) / .25 : 1; g.translate(960, 470); g.rotate(-.06); g.scale(sc, sc); g.font = '900 190px Rubik'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round'; g.lineWidth = 34; g.strokeStyle = T.INK; g.strokeText(b.w, 0, 0); g.lineWidth = 12; g.strokeStyle = '#fff'; g.strokeText(b.w, 0, 0); g.fillStyle = '#ff3a2a'; g.fillText(b.w, 0, 0); g.restore(); }
   if (t > CU.total - .8) T.tint(g, '#000', (t - (CU.total - .8)) / .8);
 }
