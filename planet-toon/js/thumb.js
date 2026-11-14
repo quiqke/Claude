@@ -28,7 +28,26 @@ function astroFace(x, y, R, f) {              // big astronaut head: suit collar
   g.save(); g.globalAlpha = .18; shape(g, ell(x, y + R * .1, R * 1.45, R * 1.4, 36), { fill: '#bfe8ff', line: false }); g.restore();
   line(g, ell(x, y + R * .1, R * 1.45, R * 1.4, 36, 0, Math.PI * 2.05), { lw: 10 }); line(g, ell(x - R * .25, y - R * .3, R * .9, R * .85, 14, Math.PI * 1.1, Math.PI * 1.45), { line: '#ffffff', lw: 12 });
 }
+const RULES = ['ПРАВИЛА:', '1. НЕ ШУМИ', '2. НЕ СТОЙ', '3. НЕ СМОТРИ НА 2-Е СОЛНЦЕ', '4. ПЕЙ СИНЮЮ', '5. НЕ ОТВЕЧАЙ ЭХУ', '6. НЕ ОТКРЫВАЙ ВТОРУЮ', '7. НАПИШИ ПРАВИЛА'];
+function pill(x, y, w, h, bg, stroke) { g.save(); g.beginPath(); g.roundRect(x, y, w, h, h / 2); g.fillStyle = bg; g.fill(); g.lineWidth = 6; g.strokeStyle = stroke || INK; g.stroke(); g.restore(); }
 const VAR = {
+  // D — the essence: you carve the rules for the next you; old capsules all around, the next one already falling
+  D() {
+    T.setCam(1100, 600, 1.05); W.loopField(g, 0, { n: 41, hero: false });
+    T.setCam();
+    const fx = 1700, fy = 230; g.save(); g.globalAlpha = .9; for (let i = 0; i < 6; i++) line(g, [[fx + 30 + i * 6, fy - 40 - i * 4], [fx + 260 + i * 10, fy - 230 - i * 6]], { line: i % 2 ? '#ff7a3a' : '#ffd23f', lw: 26 - i * 3, seed: i }); g.restore();
+    glowRings(g, fx, fy, 120, '#ffd23f', .5); shape(g, ell(fx, fy, 46, 40, 20), { fill: '#d8dde6', shade: '#a9b0bf', shadeOff: [-12, 0] });
+    // the hull plate with the rules being carved
+    T.setRot(-.04, 560, 600); shape(g, rrect(60, 230, 1000, 790, 30), { fill: '#c6ccd8', shade: '#9aa2b4', shadeOff: [-24, -16] });
+    for (let y = 300; y < 1000; y += 230) line(g, [[80, y], [1040, y]], { line: '#9aa2b4', lw: 6, seed: y }); T.setRot(0);
+    I.carve(g, 0.4, RULES, .985, { x: 120, y: 295, lh: 74, size: 60 });
+    vignette(.45);
+    astroFace(1430, 720, 230, { eyes: 'wide', brow: 'up', look: [-1, .2], sweat: true, scream: .8, side: -.5 });
+    pill(110, 1000 - 130, 380, 70, '#0a2430', '#3df2ff'); g.font = '800 40px JBMono'; g.fillStyle = '#3df2ff'; g.textBaseline = 'middle'; g.fillText('ПОПЫТКА 42', 140, 1000 - 95);
+    pill(520, 1000 - 130, 440, 70, '#5a0a0a', '#ff5a4a'); g.fillStyle = '#ff5a4a'; g.fillText('O₂', 548, 1000 - 95); g.fillStyle = 'rgba(255,255,255,.2)'; g.fillRect(620, 1000 - 108, 300, 26); g.fillStyle = '#ff3a2a'; g.fillRect(620, 1000 - 108, 18, 26);
+    big('7 ПРАВИЛ ВЫЖИВАНИЯ', 960, 110, 150, ['#ffffff', '#ffe14a'], { rot: -.02, align: 'center', max: 1840 });
+    big('ОТ САМОГО СЕБЯ', 1450, 1000, 110, ['#ff8a5a', '#ff1a1a'], { rot: -.04, align: 'center', max: 900 });
+  },
   // A — «Я УМИРАЛ ЗДЕСЬ 41 РАЗ»: the field of capsules, a giant 41
   A() {
     T.setCam(1150, 640, 1.15); W.loopField(g, 0, { n: 41, hero: false });
