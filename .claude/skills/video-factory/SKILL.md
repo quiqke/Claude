@@ -67,7 +67,9 @@ $PY $SK/cues.py <project>       # cues.json (karaoke pages, boxes, HUD, cards, a
 Check: `node $LIB/core/render/still.mjs <project> <t…> --out <project>/out/stills` (full size; `--size` crops) + `sheet.py` contact sheet, one frame per scene, before the full render.
 
 ### Retention editing (every video)
-- **A new shot every 3–5 s.** `tools/retention.js`: `makeCuts(cues, SEG)` puts cuts at caption-phrase starts (fills gaps every 4 s, never inside chapter cards); `shotFraming(...)` alternates base / close-up on the face / offset medium / wider, with a slow push-in and a 0.12 s whip at each cut. Scene-specific shots (screens, inserts, reveals) still override on their words.
+- **Shots follow the script, ~every 4–7 s.** Each scene has a shot list `[word, draw]` (`pick()` in `planet-toon/js/film.js`): every new shot shows something *different* that the voice is talking about — the flower's eye, boots in the mud, the second sun, the wrist screen, the face — never just a zoom of the same picture. Shots change on story words, never faster than 2 s.
+- **Steady, clean picture (user feedback):** no line boil animation, no camera drift / slow push-ins / whips; motion only where the story moves (a reveal pull-back, a shake on a scare). Every text (kinetic words, labels, polls, screens) is measured and kept inside its frame.
+- `tools/retention.js` (`makeCuts` / `shotFraming`) is the older automatic reframing — use it only as a filler for long stretches with no story beats.
 - **Kinetic words**: every red `**опасность**` word pops huge behind the captions for 0.7 s (`bigWords` + `drawBigWord`) with a low hit.
 - **Flash-forward in the hook**: 3 glimpses (0.35 s each, glitch + hit) of the strongest later images during the first 8 s.
 - Punch-in zoom + shake on `@danger ≥ 70`, white flash on hard cuts, portal/iris on chapter cards.
