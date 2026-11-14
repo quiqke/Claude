@@ -7,7 +7,7 @@ Script format (see ../SKILL.md, «Разметка сценария»):
   # ЗАГОЛОВОК            chapter card (shown, not spoken). Headings starting with ПРАВИЛО/ШАГ/ГЛАВА are counted for the HUD (n/N)
   @day 4 · @time 23:40 · @place МАЯК · @alert ТЕКСТ · @chapter ТЕКСТ   HUD directives, apply from the next spoken block
   > текст               a note (spoken; shown in a note box)
-  Имя: «текст»          a dialogue line (spoken without the name; shown in a dialogue box with the name)
+  Имя: «текст»          a dialogue line (one-word name, not spoken; shown in a dialogue box with the name)
   ! текст               the spoken title of the current chapter (shown as the chapter card while it is spoken, no subtitles)
   any other paragraph   narration (spoken; karaoke subtitles)
   inline emphasis: *акцент*  **опасность**  ~тихо/холод~  ==число==
@@ -95,7 +95,7 @@ for b in blocks:
     if t.startswith('>'): kind, t = 'note', t.lstrip('> ').strip()
     elif t.startswith('!'): kind, t = 'title', t.lstrip('! ').strip()
     else:
-        mm = re.match(r'^([А-ЯЁA-Z][\w\-ёЁ ]{0,20}):\s*([«"“].*)$', t)
+        mm = re.match(r'^([А-ЯЁA-Z][\w\-ёЁ]{0,20}):\s*([«"“].*)$', t)      # one-word speaker; «Ты шепчешь: «…»» stays narration
         if mm: kind, speaker, t = 'dialog', mm.group(1).strip(), mm.group(2).strip()
     ln = {'id': f'l{len(lines) + 1:03d}', 'kind': kind, 'text': t, 'spoken': plain(t), 'hud': dict(hud), 'chapter': chap_cur['id'] if chap_cur else None}
     if speaker: ln['speaker'] = speaker
