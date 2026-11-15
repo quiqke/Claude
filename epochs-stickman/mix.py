@@ -70,8 +70,6 @@ for b in [7.7, 12.95, 26.6, 33.95, 40.25, 45.6, 50.75]:
     put(sweep(.32), b - .32, .35); put(hit(), b, .5)
 put(beep(), 7.2, .5, .3)                                   # «Писк»
 # ---- foley per epoch (times from the picture)
-put(bed(1500, 6000, 7.7), 0, .12)                           # blizzard
-for i in range(28): put(tap(2200), .2 + i * .25, .05, -.3)  # chattering teeth
 put(glock(88), 3.12, .25, .3)                               # the scratch
 put(bed(60, 300, 2.2, 1.2, .5), 4.6, .5)                    # the beast comes out of the snow
 for i in range(9): put(bed(80, 400, .4, .05, .2), 7.9 + i * .32, .25, -.4)   # the block drags
