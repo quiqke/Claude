@@ -4,7 +4,7 @@
 // usage in a page:  import { createOverlay } from './overlay/overlay.js';
 //                   const ov = await createOverlay(canvasEl, await (await fetch('cues.json')).json(), { theme: 'pixel', base: './overlay/' });
 //                   window.render = t => { drawStyle(t); ov.draw(t); };
-const FONTS = { PressStart: 'fonts/PressStart2P.ttf', Rubik: 'fonts/Rubik.ttf', Caveat: 'fonts/Caveat.ttf', JBMono: 'fonts/JetBrainsMono.ttf', OldStd: 'fonts/OldStandard-Regular.ttf', OldStdB: 'fonts/OldStandard-Bold.ttf' };
+const FONTS = { PressStart: 'fonts/PressStart2P.ttf', Rubik: 'fonts/Rubik.ttf', Caveat: 'fonts/Caveat.ttf', JBMono: 'fonts/JetBrainsMono.ttf', OldStd: 'fonts/OldStandard-Regular.ttf', OldStdB: 'fonts/OldStandard-Bold.ttf', OswaldC: 'fonts/Oswald-700-cyrillic.woff2', OswaldL: 'fonts/Oswald-700-latin.woff2' };
 export const THEMES = {
   clean:   { cap: { font: '900 {s}px Rubik', size: 62, fill: '#ffffff', stroke: '#000000', sw: 10, box: null, dim: .55, up: 1.0 }, col: { acc: '#ffd23f', danger: '#ff3b3b', cool: '#4fd6ff', num: '#7dff6a', now: '#ffd23f' },
              hud: { font: '800 {s}px JBMono', size: 30, fg: '#ffffff', bg: 'rgba(0,0,0,.55)', rad: 12 }, note: { font: '700 {s}px Caveat', size: 58, bg: '#f3ead2', fg: '#2a1d10', head: 'НА ПОЛЯХ', headFont: '800 {s}px JBMono' },
@@ -18,6 +18,9 @@ export const THEMES = {
   woodcut: { cap: { font: '400 {s}px OldStd', size: 44, fill: '#111111', stroke: null, sw: 0, box: null, dim: .45, up: 1.0, margin: true }, col: { acc: '#8a4a10', danger: '#b02a1a', cool: '#2a4a6a', num: '#8a4a10', now: '#8a4a10' },
              hud: { font: '400 {s}px OldStd', size: 28, fg: '#EFE8D8', bg: null }, note: { font: '700 {s}px Caveat', size: 54, bg: '#EFE8D8', fg: '#111111', head: 'НА ПОЛЯХ — КАРАНДАШОМ', headFont: '400 {s}px OldStd' },
              dlg: { font: '400 {s}px OldStd', size: 44, bg: '#EFE8D8', fg: '#111111', border: '#111111', name: '#8a4a10' }, card: { font: '700 {s}px OldStdB', size: 96, fg: '#EFE8D8', bg: 'rgba(0,0,0,.7)', accent: '#d8962a' }, alert: { bg: '#111111', fg: '#EFE8D8', font: '700 {s}px OldStdB', size: 40 } },
+  spy:     { cap: { font: '700 {s}px OswaldC, OswaldL, Rubik', size: 74, fill: '#1b1714', stroke: null, sw: 0, box: { bg: '#efe4c9', border: null, pad: 22, rad: 0, shadow: '#1b1714' }, dim: .5, up: 1.0, lh: 1.15 }, col: { acc: '#c0392b', danger: '#d23a22', cool: '#1f8a8a', num: '#c0392b', now: '#d23a22' },
+             hud: { font: '700 {s}px OswaldC, OswaldL, Rubik', size: 34, fg: '#efe4c9', bg: '#1b1714', rad: 0 }, note: { font: '700 {s}px Caveat', size: 56, bg: '#efe4c9', fg: '#1b1714', head: 'ДОСЬЕ', headFont: '700 {s}px OswaldC, OswaldL' },
+             dlg: { font: '700 {s}px OswaldC, OswaldL, Rubik', size: 46, bg: '#1b1714', fg: '#efe4c9', border: '#e2a52a', name: '#e2a52a' }, card: { font: '700 {s}px OswaldC, OswaldL, Rubik', size: 120, fg: '#1b1714', bg: '#e2a52a', accent: '#d23a22' }, alert: { bg: '#d23a22', fg: '#efe4c9', font: '700 {s}px OswaldC, OswaldL, Rubik', size: 46 } },
 };
 const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x)), seg = (t, a, b) => clamp((t - a) / (b - a));
 const back = p => { const c = 1.7; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); };

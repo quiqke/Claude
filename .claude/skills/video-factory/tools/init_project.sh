@@ -2,14 +2,14 @@
 # Create a video-factory project: folder, script template, overlay + fonts, page skeleton.
 # usage: sh init_project.sh <project_dir> [style] [theme] [format]
 #   style: a Lemo-Opuscar style folder (pixel-rpg, halftone-dossier, woodcut …); its demo engine files are copied to js/engine/
-#   theme: overlay theme pixel | dossier | woodcut | clean (default clean);  format: 1920x1080 | 1080x1920
+#   theme: overlay theme pixel | dossier | woodcut | spy | clean (default clean);  format: 1920x1080 | 1080x1920
 set -e
 P=${1:?project dir}; STYLE=${2:-}; THEME=${3:-clean}; FMT=${4:-1920x1080}
 SK=$(cd "$(dirname "$0")/.." && pwd); LIB=${LIB:-/root/lemo-opuscar}
 W=${FMT%x*}; H=${FMT#*x}
 mkdir -p "$P/voice" "$P/js" "$P/overlay/fonts" "$P/out"
 cp "$SK/tools/overlay.js" "$P/overlay/"; cp "$SK/assets/fonts/"* "$P/overlay/fonts/"
-case "$STYLE" in toon|scifi-toon|cartoon) cp "$SK/assets/toon/"*.js "$P/js/";; esac
+case "$STYLE" in toon|scifi-toon|cartoon) cp "$SK/assets/toon/"*.js "$P/js/";; spy|spy-titles) cp "$SK/assets/spy/"*.js "$P/js/";; esac
 if [ -n "$STYLE" ] && [ -d "$LIB/styles/$STYLE/demo" ]; then mkdir -p "$P/js/engine"; cp "$LIB/styles/$STYLE/demo/"*.js "$P/js/engine/" 2>/dev/null || true; fi
 [ -f "$P/script.md" ] || cat > "$P/script.md" <<EOF
 ---

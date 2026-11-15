@@ -15,7 +15,7 @@ SK=.claude/skills/video-factory/tools   LIB=/root/lemo-opuscar   PY=$LIB/.venv/b
 - Lemo-Opuscar at `$LIB` (`.claude/skills/lemo-opuscar`), node + Chromium (pre-installed).
 - ffmpeg at `/root/opt/bin/ffmpeg`.
 - Speech recognition for alignment: `sh $SK/fetch_asr.sh` (sherpa-onnx + Vosk zipformer-ru, Apache-2.0, from GitHub releases; HF / Silero / alphacephei hosts are blocked here).
-- Music samples: `sh $LIB/tools/fetch.sh instruments vsco2ce` and `… vcsl` (orchestral + percussion).
+- Music samples: `sh $LIB/tools/fetch.sh instruments vsco2ce`, `… vcsl` (orchestral + percussion); for mood spy also `… freepats` (drum kit, electric guitar) and `… karoryfer` (jazz bass).
 - Fonts with Cyrillic are in `assets/fonts` (Press Start 2P, Rubik, Caveat, JetBrains Mono, Old Standard; OFL).
 
 ## 1. Script (сценарий) — markup
@@ -65,6 +65,14 @@ $PY $SK/cues.py <project>       # cues.json (karaoke pages, boxes, HUD, cards, a
 - emit sound events into `EV` (`{t, type, d?, v?}`, types listed in `mix.py`).
 **Default style the user likes: «Мультфильм»** — `lighthouse-toon/js/toon.js` (thick boiling outline, flat colour, hard shadows, camera with constant line weight, expressive faces with `scream`, people with walk/kneel/sit/lying, soft light pools) + `world.js` sets (exterior, room, lantern room, stairs, courtyard, close-ups) + `film.js` scene list. Copy `toon.js` into a new project and write new sets/scenes the same way. Previous pixel version (rejected as a style, kept as code reference): `lighthouse-pixel/` (16-bit Pixel RPG on `$LIB/styles/pixel-rpg/demo` engine: indexed 320×180 framebuffer, Bayer fog, sprite rig with added `hero`/`vera`, in-world Cyrillic via Press Start 2P, step counter, party join/leave windows, palette fades/mosaic/shake). For another style, read `$LIB/styles/<style>/STYLE.md` and its demo engine, keep the same contract.
 Check: `node $LIB/core/render/still.mjs <project> <t…> --out <project>/out/stills` (full size; `--size` crops) + `sheet.py` contact sheet, one frame per scene, before the full render.
+
+**Style «Шпионские титры 60-х» (Shorts, 1080×1920)** — `init_project.sh <proj> spy-titles spy 1080x1920` copies `assets/spy/spy.js`; reference film `epochs-spy/` («Сколько ты проживёшь в каждой эпохе», 54 s).
+- Look: cut paper in 4 flat inks per location (new ground colour every era), static scissor edges (`piece`, `cut`), paper shadow + cut gap, multiply paper grain (`paper(.45)`), puppets animated on twos (`tw(t)`). Type is the set: huge Oswald letters land letter-by-letter (`type(..., {land})`), columns spell «РИМ», chimneys «ЛОНДОН», sails «МАГЕЛЛАН». Merged-silhouette stickman `hero(x, feetY, scale, pose)` — poses stand, shiver, panic, run0/1, gesture, shrug, carry, cough, scratch, sit, wave, mask — red scarf accent, mustard bracelet.
+- Editing: hard cuts on words with `pick(seg, t, [[word, fn]])`, min spacing **0.4 s** for Shorts (1.2 s skipped half the shots). One literal shot per named thing («блоха» → giant flea, «мышьяк» → green wallpaper, «морфий» → syrup bottle). Hook: the death moment first, freeze with «СТОП» on the danger word, the threat starts moving on the word before. Teleport between eras = `shatter()` strips (0.3 s) + `whoosh` + `paper` sfx.
+- Payoff stamps: one global layer drawn after the shatter (`STAMPS` → `drawStamp`): cream slab «ВЫЖИЛ: 3 ДНЯ · ЛЕДНИК», lands on the number word, leaves upward 0.35 s into the next era — never put the payoff inside a scene (it got cut by the next shot).
+- Layout for Shorts: HUD rows end ≈ y 230, scene titles at y 420–480, payoff stamp ≈ y 1150, captions at H·0.80 (theme spy: cream paper strip, Oswald 74), nothing important below y 1650 (Shorts UI).
+- Sound: `music.py --mood spy` (needs events.json; swung ride, walking jazz bass, twang guitar riff, vibes, muted trumpet; brass stab on every EV `stab`, bigger + crash on `stamp`; warm coda from the line tagged `armor|finale|outro`). Mix with `--music-db -6 --bed none`. Keep danger ≥ 40 only on real peaks — the heartbeat bed runs while it stays high.
+- Render vertical with `--size 1080x1920` for both still.mjs and video.mjs (default is 1920×1080 and crops).
 
 ### Retention editing (every video)
 - **Shots follow the script, ~every 4–7 s.** Each scene has a shot list `[word, draw]` (`pick()` in `planet-toon/js/film.js`): every new shot shows something *different* that the voice is talking about — the flower's eye, boots in the mud, the second sun, the wrist screen, the face — never just a zoom of the same picture. Shots change on story words, never faster than 2 s.
