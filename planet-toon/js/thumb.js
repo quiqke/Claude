@@ -28,9 +28,66 @@ function astroFace(x, y, R, f) {              // big astronaut head: suit collar
   g.save(); g.globalAlpha = .18; shape(g, ell(x, y + R * .1, R * 1.45, R * 1.4, 36), { fill: '#bfe8ff', line: false }); g.restore();
   line(g, ell(x, y + R * .1, R * 1.45, R * 1.4, 36, 0, Math.PI * 2.05), { lw: 10 }); line(g, ell(x - R * .25, y - R * .3, R * .9, R * .85, 14, Math.PI * 1.1, Math.PI * 1.45), { line: '#ffffff', lw: 12 });
 }
+
+// ── «highlighted» text: solid colour plate, thick black border, hard drop shadow — readable at phone size
+function plate(s, x, y, size, bg, fg, o = {}) {
+  g.save(); g.translate(x, y); g.rotate(o.rot || 0); let fs = size; g.font = `900 ${fs}px Rubik`;
+  while (o.max && g.measureText(s).width + fs * .5 > o.max && fs > 40) { fs -= 4; g.font = `900 ${fs}px Rubik`; }
+  const m = g.measureText(s), w = m.width, asc = m.actualBoundingBoxAscent, des = m.actualBoundingBoxDescent, padX = fs * .24, padY = fs * .17;
+  const bx = o.align === 'center' ? -w / 2 - padX : o.align === 'right' ? -w - 2 * padX : 0, bw = w + 2 * padX, bh = asc + des + 2 * padY, by = -bh / 2;
+  const sh = o.shadow ?? Math.max(12, fs * .07);
+  g.fillStyle = '#0b0614'; g.beginPath(); g.roundRect(bx + sh, by + sh, bw, bh, fs * .08); g.fill();
+  g.fillStyle = bg; g.beginPath(); g.roundRect(bx, by, bw, bh, fs * .08); g.fill();
+  g.lineWidth = Math.max(8, fs * .05); g.strokeStyle = '#0b0614'; g.stroke();
+  g.textBaseline = 'alphabetic'; g.textAlign = 'left'; const tx = bx + padX, ty = by + padY + asc;
+  if (o.stroke) { g.lineJoin = 'round'; g.lineWidth = fs * .13; g.strokeStyle = '#0b0614'; g.strokeText(s, tx, ty); }
+  g.fillStyle = fg; g.fillText(s, tx, ty); g.restore();
+  return { w: bw, h: bh, fs };
+}
+function dof(px = 5, filt = '') {                  // blur what is already drawn (background depth), optional grade
+  const c2 = new OffscreenCanvas(1920, 1080); c2.getContext('2d').drawImage(g.canvas, 0, 0);
+  g.save(); g.filter = `blur(${px}px) ${filt}`; g.drawImage(c2, 0, 0); g.restore();
+}
+function grade() { const c2 = new OffscreenCanvas(1920, 1080); c2.getContext('2d').drawImage(g.canvas, 0, 0); g.save(); g.filter = 'saturate(1.25) contrast(1.08)'; g.drawImage(c2, 0, 0); g.restore(); }
+function sideShade(a = .75, w = 1150) { const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, `rgba(10,4,24,${a})`); gr.addColorStop(1, 'rgba(10,4,24,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, 1080); }
+function rim(x, y, R, col) { g.save(); g.globalCompositeOperation = 'lighter'; const gr = g.createRadialGradient(x, y, R * 1.2, x, y, R * 2.3); gr.addColorStop(0, col); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - R * 3, y - R * 3, R * 6, R * 6); g.restore(); }
+
+function graveyard(sharpFront = true) {          // dozens of old capsules, numbered — far rows soft, near rows sharp
+  T.setCam(); W.backdrop(g, 0, W.PAL.dusk, { stars: true, moons: true });
+  glowRings(g, 640, 650, 760, '#ff7a3a', .28);
+  let num = 41;
+  const row = (y, sc, step, x0, seed, label) => { for (let x = x0, i = 0; x < 2000; x += step, i++) { const jx = (Math.sin(i * 12.9 + seed) * .5) * step * .35, px = x + jx; W.pod(g, px, y + Math.sin(i * 7.1 + seed) * 10 * sc, sc, { old: true, seed: seed + i });
+    if (label && px > 60 && px < 880) { g.save(); g.font = `900 ${Math.round(92 * sc)}px Rubik`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.translate(px - 105 * sc, y - (sc < .8 ? 100 : 62) * sc); g.rotate(-.12);
+      g.lineJoin = 'round'; g.lineWidth = 16 * sc; g.strokeStyle = 'rgba(30,14,30,.9)'; g.strokeText('#' + num, 0, 0); g.fillStyle = '#fff4e0'; g.fillText('#' + num, 0, 0); g.restore(); num--; } } };
+  row(690, .2, 105, -40, 3); row(735, .3, 150, -80, 11); row(800, .42, 205, -60, 23);
+  dof(4, 'saturate(1.15)');
+  num = 39; row(905, .62, 300, -40, 37, true); num = 41; row(1050, .92, 440, 160, 51, true);
+}
 const RULES = ['ПРАВИЛА:', '1. НЕ ШУМИ', '2. НЕ СТОЙ', '3. НЕ СМОТРИ НА 2-Е СОЛНЦЕ', '4. ПЕЙ СИНЮЮ', '5. НЕ ОТВЕЧАЙ ЭХУ', '6. НЕ ОТКРЫВАЙ ВТОРУЮ', '7. НАПИШИ ПРАВИЛА'];
 function pill(x, y, w, h, bg, stroke) { g.save(); g.beginPath(); g.roundRect(x, y, w, h, h / 2); g.fillStyle = bg; g.fill(); g.lineWidth = 6; g.strokeStyle = stroke || INK; g.stroke(); g.restore(); }
 const VAR = {
+  // E — «Я УМИРАЛ ЗДЕСЬ / 41 РАЗ»: highlighted plates, the capsule graveyard, the scream
+  E() {
+    graveyard(); sideShade(.55, 1050); vignette(.5);
+    ring(470, 1005, 480, 112);
+    rim(1460, 640, 300, 'rgba(255,120,40,.55)');
+    astroFace(1460, 650, 300, { eyes: 'wide', brow: 'up', scream: 1.15, sweat: true, look: [-1, .25], side: -.45 });
+    plate('Я УМИРАЛ ЗДЕСЬ', 60, 170, 118, '#ffd400', '#0b0614', { rot: -.035, max: 1120 });
+    plate('41 РАЗ', 70, 470, 300, '#ff2a2a', '#ffffff', { rot: -.035, stroke: true, max: 1100 });
+    arrow(760, 650, 610, 800, 42);
+    grade();
+  },
+  // F — «Я ЗДЕСЬ / НЕ ПЕРВЫЙ»: same system, the reveal as the question
+  F() {
+    graveyard(); sideShade(.55, 1050); vignette(.5);
+    ring(470, 1005, 480, 112);
+    rim(1460, 640, 300, 'rgba(255,120,40,.55)');
+    astroFace(1460, 650, 300, { eyes: 'wide', brow: 'up', scream: 1.15, sweat: true, look: [-1, .25], side: -.45 });
+    plate('Я ЗДЕСЬ', 60, 175, 170, '#ffd400', '#0b0614', { rot: -.035, max: 1000 });
+    plate('НЕ ПЕРВЫЙ', 60, 470, 230, '#ff2a2a', '#ffffff', { rot: -.035, stroke: true, max: 1120 });
+    arrow(760, 650, 610, 800, 42);
+    grade();
+  },
   // D — the essence: you carve the rules for the next you; old capsules all around, the next one already falling
   D() {
     T.setCam(1100, 600, 1.05); W.loopField(g, 0, { n: 41, hero: false });
