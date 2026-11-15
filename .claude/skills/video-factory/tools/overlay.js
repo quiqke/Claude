@@ -28,6 +28,7 @@ const F = (f, s) => f.replace('{s}', Math.round(s));
 
 export async function createOverlay(cv, cues, o = {}) {
   const base = o.base ?? './overlay/', th = { ...THEMES[o.theme || cues.theme || 'clean'] };
+  if (o.noteHead != null) th.note = { ...th.note, head: o.noteHead };   // e.g. '' for no «НА ПОЛЯХ» header
   await Promise.all(Object.entries(FONTS).map(async ([n, u]) => { try { const f = new FontFace(n, `url(${base}${u})`); await f.load(); document.fonts.add(f); } catch (e) {} }));
   const g = cv.getContext('2d'), W = cues.W, H = cues.H, vert = H > W, k = vert ? W / 1080 : H / 1080;   // k: scale for sizes authored at 1080
   cv.width = W; cv.height = H;
@@ -142,7 +143,7 @@ export async function createOverlay(cv, cues, o = {}) {
     const st = { stats: new Map(), objective: null, danger: null, counter: null };
     for (const e of FXL) { if (e.t > t) break;
       if (e.type === 'stat') { if (e.value == null) st.stats.delete(e.name); else { const prev = st.stats.get(e.name); st.stats.set(e.name, { v: e.value, p: prev ? prev.v : e.value, t: e.t, i: prev ? prev.i : st.stats.size }); } }
-      if (e.type === 'objective') st.objective = { text: e.text, t: e.t };
+      if (e.type === 'objective') st.objective = /^off$/i.test(e.text || '') ? null : { text: e.text, t: e.t };
       if (e.type === 'danger') st.danger = { v: e.value, p: st.danger ? st.danger.v : 0, t: e.t };
       if (e.type === 'counter') st.counter = e.value == null ? null : { name: e.name, v: e.value, t: e.t };
     }

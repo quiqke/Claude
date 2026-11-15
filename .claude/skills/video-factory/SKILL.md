@@ -74,6 +74,13 @@ Check: `node $LIB/core/render/still.mjs <project> <t…> --out <project>/out/sti
 - Sound: `music.py --mood spy` (needs events.json; swung ride, walking jazz bass, twang guitar riff, vibes, muted trumpet; brass stab on every EV `stab`, bigger + crash on `stamp`; warm coda from the line tagged `armor|finale|outro`). Mix with `--music-db -6 --bed none`. Keep danger ≥ 40 only on real peaks — the heartbeat bed runs while it stays high.
 - Render vertical with `--size 1080x1920` for both still.mjs and video.mjs (default is 1920×1080 and crops).
 
+**Thriller kit (reference `bunker-toon/`, «30 дней в бункере»)** — a mystery with fair-play clues told in rules:
+- Script: open in the middle of the scariest moment (day 3), then «Вернёмся на три дня назад» (calendar rewind shot); one clue per rule chapter that the finale explains one by one; an open question mid-video («А ты бы ответил?» poll) answered on the end screen (poll with ✓).
+- Sets in `bunker-toon/js/world.js`: `room()` (one wide set; close-ups are camera framings of it), **`crossSection()`** (above ground / soil / bunker in one frame — shows who is up there without leaving the hero), **`cameraPOV()`** (green CCTV look, REC, timestamp — «он смотрит на тебя»), **`triptych()`** (the same view on ДЕНЬ 9/10/11 — a repetition clue), `periView()` (static painted world: nothing ever moves), `waveTriptych()` (identical recordings), `rulesClose()` (typed rule sheet; red marker circle/cross on rule n), `newsClose()`, `polaroid()`, `wristGrab()` (the villain's knitted sleeve = early clue), `hand()`.
+- Rule cards: the rule sheet slides up over the last shot, the rule is circled in red, «ДЕНЬ N · ЧЧ:ММ» typed in; the finale card crosses all rules out.
+- Overlay: `noteHead: ''` hides «НА ПОЛЯХ» for notes that are not margin notes; `@objective off` hides the goal.
+- Foley from words (`film.js` init): knocks, ticks bursts for the Geiger counter, static under every «Радио:» line, bolt/door/thud, dog `bark` (mix.py). Music `tension` needs `sh $LIB/tools/fetch.sh instruments salamander` (piano).
+
 ### Retention editing (every video)
 - **Shots follow the script, ~every 4–7 s.** Each scene has a shot list `[word, draw]` (`pick()` in `planet-toon/js/film.js`): every new shot shows something *different* that the voice is talking about — the flower's eye, boots in the mud, the second sun, the wrist screen, the face — never just a zoom of the same picture. Shots change on story words, never faster than 2 s.
 - **Steady, clean picture (user feedback):** no line boil animation, no camera drift / slow push-ins / whips; motion only where the story moves (a reveal pull-back, a shake on a scare). Every text (kinetic words, labels, polls, screens) is measured and kept inside its frame.
