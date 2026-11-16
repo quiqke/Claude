@@ -1,0 +1,8 @@
+«Сколько ты проживёшь в самых смертельных профессиях?» — Shorts, стиль Stick-figure Explainer
+
+Голос: озвучка автора канала, записана в Google AI Studio (Gemini TTS, голос Algenib); темп как записан, длинные паузы укорочены до 0,6 с.
+Выравнивание слов: sherpa-onnx (Apache-2.0) + модель Vosk zipformer-ru 2024-09-18 (Apache-2.0).
+Шрифт: Jost — Owen Earl (indestructible type*) — SIL Open Font License 1.1 — https://github.com/google/fonts/tree/main/ofl/jost
+Рисунок человечков, пружины и бумага: движок стиля Stick-figure Explainer библиотеки Lemo-Opuscar (MIT), скопирован в rig.js.
+Музыка и шумы: синтезированы в коде (mix.py), семплов и записей нет.
+Изображения: всё нарисовано кодом, сторонних изображений нет.
