@@ -28,7 +28,8 @@ const F = (f, s) => f.replace('{s}', Math.round(s));
 
 export async function createOverlay(cv, cues, o = {}) {
   const base = o.base ?? './overlay/', th = { ...THEMES[o.theme || cues.theme || 'clean'] };
-  if (o.noteHead != null) th.note = { ...th.note, head: o.noteHead };   // e.g. '' for no «НА ПОЛЯХ» header
+  if (o.noteHead != null) th.note = { ...th.note, head: o.noteHead };
+  const MIN = (o.hudMode || cues.hud_mode) === 'minimal';   // hud: minimal → rule chip + clock + ≤2 bars + red-edge fear pulse, nothing else   // e.g. '' for no «НА ПОЛЯХ» header
   await Promise.all(Object.entries(FONTS).map(async ([n, u]) => { try { const f = new FontFace(n, `url(${base}${u})`); await f.load(); document.fonts.add(f); } catch (e) {} }));
   const g = cv.getContext('2d'), W = cues.W, H = cues.H, vert = H > W, k = vert ? W / 1080 : H / 1080;   // k: scale for sizes authored at 1080
   cv.width = W; cv.height = H;
@@ -107,12 +108,12 @@ export async function createOverlay(cv, cues, o = {}) {
     const h = hudAt(t); if (!h) return; const S = th.hud, s = S.size * k; g.font = F(S.font, s); g.textBaseline = 'middle';
     const card = [...cues.cards].reverse().find(c => t >= c.t), main = card ? card.title.split(/[·:—]/)[0].trim() : '';
     const left = card && card.n ? (main.endsWith(String(card.n)) ? `${main}/${card.N}` : `${main}  ${card.n}/${card.N}`) : (main || h.chapter || '');
-    const blink = Math.floor(t * 2) % 2 === 0, time = h.time ? h.time.replace(':', blink ? ':' : ' ') : '', right = [h.day ? `ДЕНЬ ${h.day}` : '', time].filter(Boolean).join('  ·  ');
+    const blink = Math.floor(t * 2) % 2 === 0, time = h.time ? h.time.replace(':', blink ? ':' : ' ') : '', right = [h.day && !MIN ? `ДЕНЬ ${h.day}` : '', time].filter(Boolean).join('  ·  ');
     const pad = 16 * k, y = (vert ? 70 : 52) * k;
     const chip = (txt, x, align) => { if (!txt) return; const w = g.measureText(txt).width + pad * 2, xx = align === 'left' ? x : x - w;
       if (S.bg) { box(xx, y - s * .9, w, s * 1.8, { bg: S.bg, border: S.border, rad: S.rad }); } g.fillStyle = S.fg; g.textAlign = 'left'; g.fillText(txt, xx + pad, y); };
     chip(left.toUpperCase(), 40 * k, 'left'); chip(right.toUpperCase(), W - 40 * k, 'right');
-    if (h.place) { g.font = F(S.font, s * .7); g.fillStyle = S.fg; g.globalAlpha = .75; g.textAlign = 'right'; g.fillText(h.place.toUpperCase(), W - 40 * k - pad, y + s * 1.6); g.globalAlpha = 1; }
+    if (h.place && !MIN) { g.font = F(S.font, s * .7); g.fillStyle = S.fg; g.globalAlpha = .75; g.textAlign = 'right'; g.fillText(h.place.toUpperCase(), W - 40 * k - pad, y + s * 1.6); g.globalAlpha = 1; }
   }
   // ── chapter card
   function card(c, t) {
@@ -154,7 +155,7 @@ export async function createOverlay(cv, cues, o = {}) {
     const S = th.hud, f = s_ => F(S.font, s_), st = fxState(t), x0 = 40 * k; let y = (vert ? 130 : 110) * k;
     g.save(); g.textBaseline = 'middle'; g.textAlign = 'left';
     // stats
-    for (const [name, sv] of [...st.stats.entries()].sort((a, b) => a[1].i - b[1].i)) {
+    for (const [name, sv] of [...st.stats.entries()].sort((a, b) => a[1].i - b[1].i).slice(0, MIN ? 2 : 99)) {
       const p = seg(t, sv.t, sv.t + .6), v = sv.p + (sv.v - sv.p) * p, col = STATCOL[sv.i % STATCOL.length], bw = 300 * k, bh = 24 * k;
       pill(x0 - 8 * k, y - 24 * k, bw + 230 * k, 48 * k, S.bg || 'rgba(0,0,0,.55)', .9);
       g.font = f(S.size * .8 * k); g.fillStyle = S.fg; g.fillText(name.toUpperCase(), x0 + 6 * k, y);
@@ -165,6 +166,7 @@ export async function createOverlay(cv, cues, o = {}) {
       y += 56 * k;
     }
     // objective
+    if (MIN) { st.objective = null; st.counter = null; }
     if (st.objective) { const o = st.objective, a = seg(t, o.t, o.t + .35), hi = 1 - seg(t, o.t + .4, o.t + 1.8); g.font = f(S.size * .85 * k); const txt = 'ЦЕЛЬ: ' + o.text.toUpperCase(), w = g.measureText(txt).width + 60 * k;
       g.save(); g.translate(-(1 - a) * 300 * k, 0); pill(x0 - 8 * k, y - 24 * k, w, 48 * k, hi > 0 ? `rgba(255,210,63,${.25 + .5 * hi})` : (S.bg || 'rgba(0,0,0,.55)'), .95);
       g.fillStyle = th.col.acc; g.beginPath(); g.moveTo(x0 + 8 * k, y); g.lineTo(x0 + 16 * k, y - 8 * k); g.lineTo(x0 + 24 * k, y); g.lineTo(x0 + 16 * k, y + 8 * k); g.fill();
@@ -176,17 +178,17 @@ export async function createOverlay(cv, cues, o = {}) {
       g.font = f(S.size * 1.6 * k); g.fillStyle = th.col.num; g.fillText(String(c.v), -130 * k + w1 + 30 * k, 2 * k); g.restore(); }
     // danger: heart + bar under the clock, red pulse at the screen edges
     if (st.danger && st.danger.v > 0) { const dv = st.danger.p + (st.danger.v - st.danger.p) * seg(t, st.danger.t, st.danger.t + .8), bpm = 60 + dv * 1.0, beat = Math.pow(Math.max(0, Math.sin(t * Math.PI * bpm / 60)), 8);
-      const hx = W - 330 * k, hy = (vert ? 220 : 160) * k; pill(hx - 30 * k, hy - 22 * k, 320 * k, 44 * k, S.bg || 'rgba(0,0,0,.55)', .9);
+      const hx = W - 330 * k, hy = (vert ? 220 : 160) * k; if (!MIN) { pill(hx - 30 * k, hy - 22 * k, 320 * k, 44 * k, S.bg || 'rgba(0,0,0,.55)', .9);
       g.save(); g.translate(hx, hy); g.scale(1 + .25 * beat, 1 + .25 * beat); g.fillStyle = '#ff3b3b'; g.beginPath(); const r = 9 * k; g.arc(-r * .55, -r * .3, r * .6, Math.PI, 0); g.arc(r * .55, -r * .3, r * .6, Math.PI, 0); g.lineTo(0, r * 1.1); g.closePath(); g.fill(); g.restore();
-      g.font = f(S.size * .6 * k); g.fillStyle = S.fg; g.fillText('СТРАХ', hx + 22 * k, hy); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(hx + 120 * k, hy - 8 * k, 150 * k, 16 * k); g.fillStyle = '#ff3b3b'; g.fillRect(hx + 120 * k, hy - 8 * k, 150 * k * dv / 100, 16 * k);
+      g.font = f(S.size * .6 * k); g.fillStyle = S.fg; g.fillText('СТРАХ', hx + 22 * k, hy); g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(hx + 120 * k, hy - 8 * k, 150 * k, 16 * k); g.fillStyle = '#ff3b3b'; g.fillRect(hx + 120 * k, hy - 8 * k, 150 * k * dv / 100, 16 * k); }
       if (dv > 55) { const a = (dv - 55) / 45 * (.25 + .35 * beat), gr = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .45, W / 2, H / 2, Math.max(W, H) * .75); gr.addColorStop(0, 'rgba(255,0,0,0)'); gr.addColorStop(1, `rgba(200,0,0,${a})`); g.fillStyle = gr; g.fillRect(0, 0, W, H); } }
     // item pick-ups (slide in from the right) and toasts (top centre)
     let iy = (vert ? 420 : 300) * k;
-    for (const e of FXL) { if (e.type !== 'item' || t < e.t || t > e.t + 2.6) continue; const a = Math.min(back(seg(t, e.t, e.t + .35)), 1 - seg(t, e.t + 2.2, e.t + 2.6));
+    for (const e of FXL) { if (MIN || e.type !== 'item' || t < e.t || t > e.t + 2.6) continue; const a = Math.min(back(seg(t, e.t, e.t + .35)), 1 - seg(t, e.t + 2.2, e.t + 2.6));
       g.font = f(S.size * 1.05 * k); const txt = e.text.toUpperCase(), w = g.measureText(txt).width + 110 * k, x = W - 40 * k - w * a;
       pill(x, iy - 34 * k, w, 68 * k, S.bg || 'rgba(0,0,0,.65)'); g.fillStyle = th.col.cool; g.beginPath(); g.arc(x + 40 * k, iy, 16 * k * (1 + .2 * Math.sin(t * 12)), 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = f(S.size * .8 * k); g.textAlign = 'center'; g.fillText('★', x + 40 * k, iy + 1 * k); g.textAlign = 'left';
       g.font = f(S.size * 1.05 * k); g.fillStyle = th.col.acc; g.fillText(txt, x + 70 * k, iy); iy += 80 * k; }
-    for (const e of FXL) { if (e.type !== 'toast' || t < e.t || t > e.t + 2.4) continue; const a = Math.min(seg(t, e.t, e.t + .2), 1 - seg(t, e.t + 2, e.t + 2.4));
+    for (const e of FXL) { if (MIN || e.type !== 'toast' || t < e.t || t > e.t + 2.4) continue; const a = Math.min(seg(t, e.t, e.t + .2), 1 - seg(t, e.t + 2, e.t + 2.4));
       g.font = f(S.size * .8 * k); const txt = '✓ ' + e.text.toUpperCase(), w = g.measureText(txt).width + 50 * k, y2 = (vert ? 300 : 200) * k - (1 - a) * 30 * k;
       g.globalAlpha = a; pill(W / 2 - w / 2, y2 - 24 * k, w, 48 * k, S.bg || 'rgba(0,0,0,.65)'); g.fillStyle = th.col.num; g.textAlign = 'center'; g.fillText(txt, W / 2, y2); g.textAlign = 'left'; g.globalAlpha = 1; }
     g.restore();

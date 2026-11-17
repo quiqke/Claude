@@ -84,7 +84,7 @@ for c in chapters:
     if first is None: continue                        # chapter not voiced at all
     t = T['lines'][first]['t0']
     cards.append({'t': round(t - .45, 3), 'd': 2.6, 'title': c['title'], 'n': c.get('n'), 'N': c.get('N')})
-json.dump({'W': W, 'H': H, 'theme': meta.get('theme', 'clean'), 'total': T['total'], 'pages': out_pages, 'boxes': notes_dialogs, 'hud': hud, 'cards': cards, 'alerts': alerts, 'lines': LT, 'fx': sorted(FX, key=lambda e: e['t'])},
+json.dump({'W': W, 'H': H, 'theme': meta.get('theme', 'clean'), 'hud_mode': meta.get('hud', 'full'), 'total': T['total'], 'pages': out_pages, 'boxes': notes_dialogs, 'hud': hud, 'cards': cards, 'alerts': alerts, 'lines': LT, 'fx': sorted(FX, key=lambda e: e['t'])},
           open(os.path.join(P, 'cues.json'), 'w', encoding='utf-8'), ensure_ascii=False)
 # subtitles file for YouTube (pages + note/dialog text)
 def ts(t): t = max(0, t); h = int(t // 3600); m = int(t % 3600 // 60); s = t % 60; return f'{h:02d}:{m:02d}:{int(s):02d},{int(round((s % 1) * 1000)):03d}'
