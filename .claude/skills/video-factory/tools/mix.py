@@ -86,7 +86,9 @@ S['stamp'] = lambda v=1: (np.sin(2 * np.pi * 70 * tt(.35)) * env(.35, .001, .07)
 S['paper'] = lambda v=1: (bp(rng.standard_normal(int(.25 * SR)), 1200, 7000) * env(.25, .002, .05) * .7 + lp(rng.standard_normal(int(.25 * SR)), 600) * env(.25, .001, .02) * .5) * v
 S['bark'] = lambda v=1: (bp(rng.standard_normal(int(.22 * SR)), 350, 2200) * env(.22, .004, .06) * .9 + np.sin(2 * np.pi * np.cumsum(520 - 260 * tt(.22) / .22) / SR) * env(.22, .004, .07) * .5) * v
 S['engine'] = lambda d=4, v=1: (lp(rng.standard_normal(int(d * SR)), 220) * 1.6 + np.sin(2 * np.pi * 42 * tt(d)) * .5 * (1 + .3 * np.sin(2 * np.pi * 7 * tt(d)))) * env(d, .4) * .35 * v
-LONG = {'engine', 'scratch', 'winch', 'rain', 'static', 'wind', 'crank', 'hiss', 'scribble'}
+S['fire'] = lambda d=4, v=1: (bp(rng.standard_normal(int(d * SR)), 300, 2500) * .25 + bp(rng.standard_normal(int(d * SR)), 1500, 6000) * (rng.random(int(d * SR)) < .004) * 3) * env(d, .4) * .5 * v
+S['horn'] = lambda v=1: sum(np.sign(np.sin(2 * np.pi * f * tt(2.6) * (1 + .003 * np.sin(2 * np.pi * 5 * tt(2.6))))) for f in (87, 110)) * lp(np.ones(int(2.6 * SR)), 1) * 0 + lp(sum(np.sign(np.sin(2 * np.pi * f * tt(2.6))) for f in (87, 110)), 900) * env(2.6, .15) * .25 * v
+LONG = {'fire', 'engine', 'scratch', 'winch', 'rain', 'static', 'wind', 'crank', 'hiss', 'scribble'}
 PAN = {'knock': .35, 'tap': -.4, 'tick': -.3, 'step': .1, 'stepOut': .1, 'scratch': -.2, 'static': -.3, 'splat': .3}
 # ── events from the page
 evp = os.path.join(P, 'events.json'); EV = []
