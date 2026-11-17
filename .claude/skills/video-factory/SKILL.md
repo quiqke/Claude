@@ -105,6 +105,7 @@ Check: `node $LIB/core/render/still.mjs <project> <t…> --out <project>/out/sti
 - **Kinetic words**: every red `**опасность**` word pops huge behind the captions for 0.7 s (`bigWords` + `drawBigWord`) with a low hit.
 - **Flash-forward in the hook**: 3 glimpses (0.35 s each, glitch + hit) of the strongest later images during the first 8 s.
 - Punch-in zoom + shake on `@danger ≥ 70`, white flash on hard cuts, portal/iris on chapter cards.
+- Never stack two big overlays: suppress the kinetic red word while the СТОП freeze is on (a danger word right after the freeze collided with «СТОП» in island-toon).
 - More ideas to use when the story allows: on-screen choice/poll before a twist («А ты бы открыл? ДА / НЕТ»), freeze-frame + «СТОП» + question, live countdown timer, mid-video «подпишись» pop at ~35 %, silence before a scare.
 
 ## 4. Sound
