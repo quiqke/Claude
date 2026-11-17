@@ -7,7 +7,7 @@ const cues = await (await fetch('./cues.json')).json();
 const thumb = new URLSearchParams(location.search).get('thumb');   // ?thumb=A|B|C → YouTube thumbnail
 const film = await import(thumb ? './js/thumb.js' : './js/film.js');
 const st = await film.init(document.getElementById('stage'), cues, thumb);
-const ov = thumb ? { draw() {} } : await createOverlay(document.getElementById('ov'), cues, { theme: cues.theme, base: './overlay/' });
+const ov = thumb ? { draw() {} } : await createOverlay(document.getElementById('ov'), cues, { theme: cues.theme, base: './overlay/', noteHead: '' });
 window.DUR = cues.total; window.EV = st.EV || [];
 window.render = t => { st.draw(t); ov.draw(t); };
 window.READY = true;
