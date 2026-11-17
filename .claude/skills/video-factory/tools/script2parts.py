@@ -68,7 +68,7 @@ def fx_of(k, v):
     elif k == 'danger': e['value'] = float(v)
     else: e['text'] = v
     return e
-COUNTED = re.compile(r'^(ПРАВИЛО|ШАГ|ГЛАВА|СОВЕТ|ЧАСТЬ|RULE|STEP)\b', re.I)
+COUNTED = re.compile(r'^(ПРАВИЛО|ШАГ|ГЛАВА|СОВЕТ|ЧАСТЬ|ДЕНЬ|RULE|STEP|DAY)\b', re.I)
 for b in blocks:
     text_lines = []
     for ln in b.split('\n'):
