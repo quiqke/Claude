@@ -46,6 +46,8 @@
 
 ## Превью (для «Тест и сравнение»)
 
-- `thumbnails/1-mama-zovet-ne-otvechay.jpg` — главное
+- `thumbnails/4-eto-mama-ne-otvechay.jpg` — главное (разрез: мама наверху, ты под землёй)
+- `thumbnails/5-30-dney-pod-zemlyoy-on-smotrit.jpg`
+- `thumbnails/1-mama-zovet-ne-otvechay.jpg`
 - `thumbnails/2-snaruzhi-vse-mertvy-ili-net.jpg`
 - `thumbnails/3-ne-otkryvay-30-dney.jpg`

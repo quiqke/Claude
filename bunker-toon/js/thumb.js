@@ -67,5 +67,37 @@ const VAR = {
     T.dot(g, 1840, 90, 22, '#ff2a2a'); T.glowRings(g, 1840, 90, 70, '#ff2a2a', .35);
     grade();
   },
+  // D — «ЭТО МАМА? / НЕ ОТВЕЧАЙ!»: two big faces — mom calling above the ground, you under it with hands over the mouth
+  D() {
+    W.bg(g, '#141c38'); for (let i = 0; i < 50; i++) T.dot(g, (i * 397) % 1920, (i * 233) % 420, 2.5, '#e8e0ff');
+    g.save(); g.globalAlpha = .28; g.fillStyle = '#fff6c8'; g.beginPath(); g.moveTo(1180, 330); g.lineTo(900, 520); g.lineTo(1120, 520); g.fill(); g.restore();
+    T.shape(g, [[-100, 470], [2100, 470], [2100, 590], [-100, 590]], { fill: W.C.soil, shade: W.C.soilS, shadeOff: [0, -20] });
+    for (let i = 0; i < 18; i++) T.shape(g, T.ell((i * 211) % 1920, 500 + (i * 37) % 70, 18, 11, 10), { fill: '#7a6050', lw: 4, seed: i });
+    T.shape(g, [[0, 590], [1920, 590], [1920, 1100], [0, 1100]], { fill: '#2e342c', line: false });
+    T.shape(g, T.rect(1000, 330, 50, 330), { fill: '#7a817a', lw: 6 }); T.shape(g, [[970, 330], [1080, 330], [1025, 290]], { fill: '#6a706a', lw: 6 });
+    // mom above: big face, purple coat, flashlight glow
+    T.glowRings(g, 1420, 270, 300, '#ffe7a0', .18);
+    T.shape(g, [[1180, 520], [1250, 400], [1590, 400], [1660, 520]], { fill: '#8b5a9b', shade: '#68407a', shadeOff: [-30, 0] });
+    T.face(g, 1420, 250, 170, T.CAST.mom, { eyes: 'wide', brow: 'worried', scream: .7, look: [-.6, .7], tear: true, side: -.3 });
+    for (let k = 0; k < 4; k++) T.line(g, T.ell(1025, 640, 90 + k * 70, 40 + k * 32, 24, 0, Math.PI), { line: '#ffe7a0', lw: 10 - k * 2 });
+    // you below
+    W.bigFace(g, 0, { eyes: 'wide', brow: 'up', look: [-.3, -1], sweat: true, side: -.2 }, { noBg: true, hands: true, x: 1460, y: 800, R: 210 });
+    T.dark(g, .35, [{ x: 1460, y: 800, r: 420 }, { x: 1420, y: 260, r: 420 }], '#05081a');
+    vignette(.4);
+    plate('ЭТО МАМА?', 50, 170, 160, '#ffd400', '#0b0614', { rot: -.035, max: 860 });
+    plate('НЕ ОТВЕЧАЙ!', 60, 440, 190, '#ff2a2a', '#ffffff', { rot: -.035, stroke: true, max: 900 });
+    grade();
+  },
+  // E — «30 ДНЕЙ ПОД ЗЕМЛЁЙ / ОН СМОТРИТ»: the red dot in the ceiling is a camera
+  E() {
+    g.save(); g.translate(-380, 60); W.redDotClose(g, 0.2, { lens: 1, beam: .6 }); g.restore(); dof(2, 'saturate(1.2)'); sideShade(.45, 1000); vignette(.5);
+    T.glowRings(g, 700, 530, 160, '#ff2a2a', .35);
+    rim(1460, 620, 300, 'rgba(255,60,40,.4)');
+    W.bigFace(g, 0, { eyes: 'wide', brow: 'up', look: [-1, -.8], sweat: true, side: -.4, scream: .8 }, { noBg: true, x: 1460, y: 600, R: 300 });
+    plate('30 ДНЕЙ ПОД ЗЕМЛЁЙ', 50, 130, 110, '#ffd400', '#0b0614', { rot: -.035, max: 1150 });
+    plate('ОН СМОТРИТ', 60, 360, 190, '#ff2a2a', '#ffffff', { rot: -.035, stroke: true, max: 1100 });
+    arrow(380, 800, 590, 600, 40);
+    grade();
+  },
 };
 function draw() { T.setTime(0); T.setCam(); g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#000'; g.fillRect(0, 0, 1920, 1080); VAR[V](); T.setCam(); }
