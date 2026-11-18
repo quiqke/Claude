@@ -7,3 +7,4 @@
 | §3 Colour | one palette per world, any hue | channel ground: cherry, navy, gold behind cream faces; worlds stay deep and saturated | cream heads pop on dark warm grounds |
 | §4 Subtitles | white with 11 px black outline, speaker pill | white on a dark translucent plate, Nunito 900 (Cyrillic), y ≈ 1500 | the reference's caption look; readable over any set; clear of the Shorts UI |
 | §8 Native move | — | Face slam: hard push-in to one round face on an extra-blurred set | the channel's signature beat |
+| §2 Bodies | noodle limbs with flat fills, drawn hands | coloured stickmen: single-line ink limbs, round dot hands, flat shoes; colour only in garment blocks and costume ideas | user's note: «в стиле стикмен, только цветной» |

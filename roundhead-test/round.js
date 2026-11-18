@@ -32,45 +32,57 @@ export function roundHead(R, mood, { look = [0, 0], o = 0, nose = true } = {}) {
   if (nose) stroke([[0, R * .02], [0, R * .26]], 6);
 }
 
-// —— ТЫ, round: the same costume ideas (orange headphones, starry pyjamas), drawn on the round-head body ——
+// —— stick limbs: one ink line from root to tip (a soft bend), a small round hand or a flat shoe ——
+function limb(a, b, bend = 0, w = 12) { const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1; stroke(quad(a, [(a[0] + b[0]) / 2 - dy / L * bend, (a[1] + b[1]) / 2 + dx / L * bend], b, 14), w); }
+const handDot = (p) => dot(p[0], p[1], 13);
+const shoe = (p, col) => shape(ell(p[0] + 14, p[1] - 6, 30, 14, 18), { fill: col, lw: 6 });
+
+// —— ТЫ, coloured stickman: a big round head, a teal T-shirt block, orange headphones, starry pyjama shorts, stick limbs ——
 export function rTim(P) {
   const f = P.face ?? 1, mood = P.mood || 'deadpan', ner = P.nerv ?? 0;
   const jit = ner ? (hash(Math.floor((P.t || 0) * 12) * 3.3) - .5) * 8 * ner : 0;
   push(); translate(P.x + jit, P.y); scale((P.s ?? 1) * f, (P.s ?? 1) * (P.sq ?? 1)); rotate(P.spin || 0);
-  for (const sx of [-1, 1]) { const lg = (sx < 0 ? P.legL : P.legR) || [0, 0];
-    shape(noodle([sx * 24, -230], [sx * 28 + lg[0], -22 + lg[1]], 0, 40, 36), { fill: RP.pj, lw: 7, shade: () => { for (let k = 0; k < 3; k++) dot(sx * 26 + lg[0] * (k + .5) / 3, -200 + k * 60, 5, RP.star); } });
-    shape(ell(sx * 34 + lg[0], -10 + lg[1], 38, 18, 20), { fill: '#d8d2e2', lw: 6 }); }
+  const hip = [0, -250], legL = P.legL || [0, 0], legR = P.legR || [0, 0];
+  for (const [sx, lg] of [[-1, legL], [1, legR]]) { const ft = [sx * 46 + lg[0], -6 + lg[1]]; limb([sx * 14, -240], ft, sx * -8); shoe(ft, '#d8d2e2'); }
   push(); rotate(P.lean ?? 0);
-  const arm = (sh, a) => { const hp = [sh[0] + a.h[0], sh[1] + a.h[1]]; shape(noodle(sh, hp, a.bend ?? 0, 24, 20), { fill: RP.tee, lw: 6 }); shape(ell(hp[0], hp[1], 18, 18, 16), { fill: RP.face, lw: 6 }); };
-  arm([-50, -420], P.armL || { h: [-18, 170], bend: -14 });
-  shape(rr(-62, -450, 124, 230, 40), { fill: RP.tee, lw: 7, shade: () => fillOnly(rect(20, -460, 70, 250), RP.teeS, { boil: .3 }) });
-  shape(arc(0, -444, 58, 24, 0, Math.PI, 20).concat(arc(0, -444, 42, 12, Math.PI, 0, 20)), { fill: RP.phone, lw: 6 });
-  for (const sx of [-1, 1]) shape(ell(sx * 56, -442, 20, 26, 16), { fill: RP.phone, lw: 6, shade: () => fillOnly(ell(sx * 56 + 8, -438, 10, 16, 12), RP.phoneS, { boil: .3 }) });
-  push(); translate(0, -590); rotate(P.headTilt ?? 0); scale(1.4); roundHead(108, mood, { look: P.look, o: P.o });
-  shape(spline([[-96, -40], [-80, -96], [-20, -118], [50, -112], [96, -60], [70, -84], [30, -78], [0, -96], [-30, -76]]), { fill: '#3a2620', lw: 6 });   // a hair cap
-  smallMouth(0, 56, mood, P.o || 0); pop();
-  arm([50, -420], P.armR || { h: [18, 170], bend: 14 });
+  shape(rr(-46, -270, 92, 54, 14), { fill: RP.pj, lw: 6, shade: () => { dot(-20, -246, 5, RP.star); dot(18, -236, 5, RP.star); } });   // starry shorts
+  const shL = [-38, -440], shR = [38, -440], aL = P.armL || { h: [-40, 160], bend: -12 }, aR = P.armR || { h: [40, 160], bend: 12 };
+  const armL = () => { const hp = [shL[0] + aL.h[0], shL[1] + aL.h[1]]; limb(shL, hp, aL.bend); handDot(hp); };
+  const armR = () => { const hp = [shR[0] + aR.h[0], shR[1] + aR.h[1]]; limb(shR, hp, aR.bend); handDot(hp); };
+  armL();
+  shape(spline([[-44, -460], [44, -460], [56, -380], [50, -262], [-50, -262], [-56, -380]]), { fill: RP.tee, lw: 7, shade: () => fillOnly(rect(16, -470, 60, 220), RP.teeS, { boil: .3 }) });
+  stroke([[0, -470], [0, -500]], 12);                                                                              // stick neck
+  shape(arc(0, -470, 56, 22, 0, Math.PI, 20).concat(arc(0, -470, 40, 10, Math.PI, 0, 20)), { fill: RP.phone, lw: 6 });
+  for (const sx of [-1, 1]) shape(ell(sx * 54, -468, 19, 24, 16), { fill: RP.phone, lw: 6, shade: () => fillOnly(ell(sx * 54 + 8, -464, 9, 14, 12), RP.phoneS, { boil: .3 }) });
+  push(); translate(0, -640); rotate(P.headTilt ?? 0); scale(1.5); roundHead(100, mood, { look: P.look, o: P.o });
+  shape(spline([[-90, -36], [-74, -90], [-20, -110], [46, -104], [90, -56], [66, -78], [28, -72], [0, -90], [-28, -70]]), { fill: '#3a2620', lw: 6 });
+  smallMouth(0, 52, mood, P.o || 0); pop();
+  armR();
   pop(); pop();
 }
-// —— Зиновий Маркович, round: colander helmet, walrus moustache, cardigan and apron ——
+// —— Зиновий Маркович, coloured stickman: a big round head with a walrus moustache and a colander, a round mustard cardigan with an apron, stick limbs ——
 export function rZin(P) {
   const f = P.face ?? 1, mood = P.mood || 'deadpan';
   push(); translate(P.x, P.y); scale((P.s ?? 1) * f, P.s ?? 1);
-  for (const sx of [-1, 1]) { shape(noodle([sx * 34, -120], [sx * 36, -20], 0, 38, 36), { fill: '#d8d2c4', lw: 6 }); shape(ell(sx * 44, -10, 40, 18, 18), { fill: '#3e2a20', lw: 6 }); }
-  const arm = (sh, a, cup) => { const hp = [sh[0] + a.h[0], sh[1] + a.h[1]]; shape(noodle(sh, hp, a.bend ?? 0, 36, 30), { fill: RP.cardi, lw: 6 }); shape(ell(hp[0], hp[1], 17, 17, 16), { fill: RP.face, lw: 6 });
-    if (cup) { push(); translate(hp[0] + 22, hp[1] - 14); shape([[-24, -24], [24, -24], [18, 6], [-18, 6]], { fill: '#f6f1e6', lw: 5 }); shape(ell(0, -24, 24, 6, 16), { fill: '#a8622c', lw: 4 }); pop(); } };
-  arm([-70, -290], P.armL || { h: [-26, 110], bend: -12 });
-  shape(spline([[0, -330], [84, -304], [116, -210], [96, -120], [0, -104], [-96, -120], [-116, -210], [-84, -304]]), { fill: RP.cardi, lw: 7, shade: () => fillOnly(spline([[40, -340], [120, -290], [136, -190], [104, -100], [60, -100], [92, -210]]), RP.cardiS, { boil: .4 }) });
-  shape(spline([[-44, -290], [44, -290], [66, -124], [-66, -124]]), { fill: RP.apron, lw: 6 });
-  push(); translate(0, -450); rotate(P.headTilt ?? 0); scale(1.35);
-  roundHead(96, mood, { look: P.look, o: P.o });
-  shape(spline([[-4, 26], [-44, 22], [-74, 46], [-50, 44], [-20, 40], [0, 34], [20, 40], [50, 44], [74, 46], [44, 22], [4, 26]]), { fill: RP.moust, lw: 5 });
-  smallMouth(0, 62, mood === 'smug' ? 'smug' : mood, P.o || 0);
-  shape([...arc(0, -50, 100, 80, Math.PI, TAU, 30), [100, -42], [-100, -42]], { fill: RP.colander, lw: 7, shade: () => { fillOnly(ell(46, -90, 50, 34, 20), RP.colanderS, { boil: .3 }); for (let i = 0; i < 9; i++) for (let j = 0; j < 3; j++) dot(-72 + i * 18 + (j % 2) * 9, -66 - j * 20, 3.4, '#6b7280'); } });
-  stroke([[-116, -44], [116, -44]], 9); stroke(spline([[0, -128], [8, -164], [-6, -192], [10, -218]], false), 5); dot(10, -220, 9, '#ff4a3a');
+  for (const sx of [-1, 1]) { const ft = [sx * 40, -6]; limb([sx * 18, -150], ft, 0); shoe(ft, '#3e2a20'); }
+  push(); rotate(P.lean ?? 0);
+  const shL = [-60, -300], shR = [60, -300], aL = P.armL || { h: [-36, 130], bend: -10 }, aR = P.armR || { h: [36, 120], bend: 10 };
+  const armL = () => { const hp = [shL[0] + aL.h[0], shL[1] + aL.h[1]]; limb(shL, hp, aL.bend); handDot(hp); };
+  const armR = () => { const hp = [shR[0] + aR.h[0], shR[1] + aR.h[1]]; limb(shR, hp, aR.bend); handDot(hp);
+    if (P.cup) { push(); translate(hp[0] + 22, hp[1] - 16); shape([[-24, -24], [24, -24], [18, 6], [-18, 6]], { fill: '#f6f1e6', lw: 5 }); shape(ell(0, -24, 24, 6, 16), { fill: '#a8622c', lw: 4 }); pop(); } };
+  armL();
+  shape(spline([[0, -330], [80, -306], [104, -220], [86, -150], [0, -134], [-86, -150], [-104, -220], [-80, -306]]), { fill: RP.cardi, lw: 7, shade: () => fillOnly(spline([[36, -340], [110, -290], [124, -200], [96, -130], [56, -130], [86, -220]]), RP.cardiS, { boil: .4 }) });
+  shape(spline([[-38, -296], [38, -296], [58, -150], [-58, -150]]), { fill: RP.apron, lw: 6 });
+  stroke([[0, -330], [0, -360]], 12);
+  push(); translate(0, -470); rotate(P.headTilt ?? 0); scale(1.4);
+  roundHead(90, mood, { look: P.look, o: P.o });
+  shape(spline([[-4, 24], [-42, 20], [-70, 44], [-48, 42], [-18, 38], [0, 32], [18, 38], [48, 42], [70, 44], [42, 20], [4, 24]]), { fill: RP.moust, lw: 5 });
+  smallMouth(0, 58, mood, P.o || 0);
+  shape([...arc(0, -46, 94, 76, Math.PI, TAU, 30), [94, -38], [-94, -38]], { fill: RP.colander, lw: 7, shade: () => { fillOnly(ell(44, -86, 48, 32, 20), RP.colanderS, { boil: .3 }); for (let i = 0; i < 9; i++) for (let j = 0; j < 3; j++) dot(-68 + i * 17 + (j % 2) * 8, -62 - j * 19, 3.2, '#6b7280'); } });
+  stroke([[-110, -40], [110, -40]], 9); stroke(spline([[0, -122], [8, -156], [-6, -184], [10, -208]], false), 5); dot(10, -210, 9, '#ff4a3a');
   pop();
-  arm([66, -290], P.armR || { h: [36, 104], bend: 14 }, P.cup);
-  pop();
+  armR();
+  pop(); pop();
 }
 
 // —— a set in the new palette: cherry curtains with gold ovals, a wooden counter (drawn into the back layer, then blurred) ——
