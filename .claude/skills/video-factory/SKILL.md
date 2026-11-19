@@ -37,6 +37,13 @@ Write `<project>/script.md` (template: `sh $SK/init_project.sh <project> <style>
 7. Climax face to face, a callback line («Ты же плаваешь как топор» → «Как топор. Но меня учили не паниковать»), then a warm resolution.
 8. Real, shareable survival facts in every chapter; mid-video «кто, по-твоему…? напиши в комментариях»; end question + «подпишись».
 
+**Survival-thriller picture kit (reference `liner-toon/js/world.js` + `film.js`)**:
+- **Live ticking clock** under the HUD: «В ВОДЕ h:mm:ss» counts story time between two spoken words (`WATER = {t0: wsc('push','соскальзывают'), t1: wsc('h6_rescue','вытаскивают')}`), interpolated from the `@time` marks so it jumps forward across chapters; turns red past the danger limit and green «СПАСЁН» after the rescue. Use it whenever the story has a clock (air, cold, fuel, battery).
+- Sets: `liner()` (night/day, wake), `inWater()` (POV from the water: liner/boat on the horizon, head bobbing), `stern()` (rail, foam, hero leaning, pusher silhouette, smell lines), `pushHands()`, `wristScratch()` (bracelet slid off → three red scratches = the proof), `chatPhone()` (pouch, bars, battery, chat bubbles, «не доставлено», SOS flashlight), `jeansFloat()` / `floatTop()` (step-by-step jeans float), `helpPose()`, `stars()` (Big Dipper → Polaris), `jelly()`, `clueBoard()` (the clues as cards behind the comment poll), `restaurant()`, `rescueDeck()`, `port()`, `cupFall()`, `phoneCall()` (split screen with dad).
+- The hook's first shot is the place of the crime (stern with the hero at the rail), not a wide establishing shot; then the push, the fall, the face in the water.
+- Comment poll with the two suspects («КТО ТЕБЯ ТОЛКНУЛ? АРТЁМ / КРАСНАЯ РУБАШКА») over the clue board; СТОП freeze on the villain's face at the moment he sees you; end poll on the survival fact («А ТЫ ЗНАЛ ПРО ДЖИНСЫ?»).
+- Thumbnails: A = the crime + the question (liner at night, the figure at the rail circled red, your face in the water, «МЕНЯ СТОЛКНУЛИ / КТО?»); B = the survival trick (inflated knotted jeans around the neck + arrow, «40 КМ ДО БЕРЕГА / ТОЛЬКО ДЖИНСЫ»); C = the payoff on the villain's face (shocked friend, falling cup, «ОН ДУМАЛ, / Я УТОНУЛ»).
+
 **Format «7 дней выживания» (user, Nov 2026; reference `island-toon/`, «7 дней на необитаемом острове»)** — not rules but a day-by-day survival story:
 - Chapters `# ДЕНЬ N · Название` (ДЕНЬ is counted → HUD chip «ДЕНЬ n/7», voiced «День первый. Песок.»). Hook in medias res on day 7 at the decisive moment + the open loop (the diary's last entry), then «Вернёмся на семь дней назад»; a short prologue (how you got there) before ДЕНЬ 1.
 - Each day = one survival problem solved with concrete actions and a real fact (water: never sea water, dew on plastic, green coconuts; fire: a water bottle as a lens; signal: SOS in stones, green leaves for white smoke, three fires in a triangle; shelter, storm → high ground) + one step of the mystery.
@@ -115,7 +122,7 @@ Check: `node $LIB/core/render/still.mjs <project> <t…> --out <project>/out/sti
 - **Kinetic words**: every red `**опасность**` word pops huge behind the captions for 0.7 s (`bigWords` + `drawBigWord`) with a low hit.
 - **Flash-forward in the hook**: 3 glimpses (0.35 s each, glitch + hit) of the strongest later images during the first 8 s.
 - Punch-in zoom + shake on `@danger ≥ 70`, white flash on hard cuts, portal/iris on chapter cards.
-- Never stack two big overlays: suppress the kinetic red word while the СТОП freeze is on (a danger word right after the freeze collided with «СТОП» in island-toon).
+- Never stack two big overlays: suppress the kinetic red word while the СТОП freeze is on (a danger word right after the freeze collided with «СТОП» in island-toon), and never draw a big prop caption («ТОЛЧОК!») in a shot keyed to a red `**word**` — the kinetic word already says it.
 - More ideas to use when the story allows: on-screen choice/poll before a twist («А ты бы открыл? ДА / НЕТ»), freeze-frame + «СТОП» + question, live countdown timer, mid-video «подпишись» pop at ~35 %, silence before a scare.
 
 ## 4. Sound
