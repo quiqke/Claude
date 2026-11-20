@@ -158,6 +158,7 @@ Thumbnail text = **highlighted plates** (user's preferred look, `planet-toon/js/
 
 ## Lessons (keep)
 - Never ask the user to paste API keys into chat; voices come from AI Studio by hand.
+- If AI Studio won't voice a part (freezer-toon part 2, 339 words): split it into two pieces of ≤ 200 words named `part2.wav` + `part2b.wav` (align.py takes all part*.wav in natural order, nothing else changes) and soften lines that read like a farewell note («если не доживёшь до утра, пусть знают…» → «Это улика. Утром её прочтут»).
 - Phones refused full-range yuvj420p and > 10 Mbit files → always `encode.sh`.
 - Without ASR, pause-based alignment drifts on long takes (`align_pauses.py` is only a fallback).
 - Character proportion inside a block is not good enough for karaoke; word times come from the recogniser.
