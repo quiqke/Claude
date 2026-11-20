@@ -11,6 +11,7 @@ mkdir -p "$P/voice" "$P/js" "$P/overlay/fonts" "$P/out"
 cp "$SK/tools/overlay.js" "$P/overlay/"; cp "$SK/assets/fonts/"* "$P/overlay/fonts/"
 case "$STYLE" in toon|scifi-toon|cartoon) cp "$SK/assets/toon/"*.js "$P/js/";; spy|spy-titles) cp "$SK/assets/spy/"*.js "$P/js/";; esac
 if [ -n "$STYLE" ] && [ -d "$LIB/styles/$STYLE/demo" ]; then mkdir -p "$P/js/engine"; cp "$LIB/styles/$STYLE/demo/"*.js "$P/js/engine/" 2>/dev/null || true; fi
+[ -f "$P/.gitignore" ] || printf 'voice/*.wav\nout/\n*.wav\n*.mp4\n' > "$P/.gitignore"   # never commit audio, renders or render segments
 [ -f "$P/script.md" ] || cat > "$P/script.md" <<EOF
 ---
 title: Название ролика
