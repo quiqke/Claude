@@ -54,6 +54,8 @@ Write `<project>/script.md` (template: `sh $SK/init_project.sh <project> <style>
 - Comment poll with the two suspects («КТО ТЕБЯ ТОЛКНУЛ? АРТЁМ / КРАСНАЯ РУБАШКА») over the clue board; СТОП freeze on the villain's face at the moment he sees you; end poll on the survival fact («А ТЫ ЗНАЛ ПРО ДЖИНСЫ?»).
 - Thumbnails: A = the crime + the question (liner at night, the figure at the rail circled red, your face in the water, «МЕНЯ СТОЛКНУЛИ / КТО?»); B = the survival trick (inflated knotted jeans around the neck + arrow, «40 КМ ДО БЕРЕГА / ТОЛЬКО ДЖИНСЫ»); C = the payoff on the villain's face (shocked friend, falling cup, «ОН ДУМАЛ, / Я УТОНУЛ»).
 
+**Freezer kit (reference `freezer-toon/`, «Меня заперли в морозилке»)**: `fzRoom()` (walk-in freezer: door with a window and the emergency knob plate, racks, carcasses, evaporator fans + `wind`, `film` wrap, `fanStop`, the sensor on a wire, pallet + cardboard layers, light phases: lit → pitch dark → phone torch → dim), `frostFace()` (white brows, frost in the hair, red nose, breath, icicles, shiver), `cocoon()` (cling-film wrap, pelmeni box hat), `knobClose`, `windowClose` (face appears / is gone), `thermo` (LCD, alarm), `hoursBar`, `kitchen`, `invoice` (200 vs 50 kg), `backDoor`, `corridorDoor` (screwdriver, lock bolt, open), `polar` / `iceFishing` / `grandpaHome` (grandpa memories), `chat` (auto-height bubbles, Wi-Fi, notifications, alarm, spinner, dead screen), `boxWrite` (marker writing), `suspects` (two cards, highlight), `tablet` (freezer log), `pockets`, `puffer`, `bigThermo` (chapter background). Chapters are body temperatures (`# 36,6° · Пот`, spoken «Тридцать шесть и шесть. Пот.»); the live chip «ТЫ 34,2° · КАМЕРА −25°» interpolates between chapter cards and flips to red «+30°» when the sensor is warmed.
+
 **Format «7 дней выживания» (user, Nov 2026; reference `island-toon/`, «7 дней на необитаемом острове»)** — not rules but a day-by-day survival story:
 - Chapters `# ДЕНЬ N · Название` (ДЕНЬ is counted → HUD chip «ДЕНЬ n/7», voiced «День первый. Песок.»). Hook in medias res on day 7 at the decisive moment + the open loop (the diary's last entry), then «Вернёмся на семь дней назад»; a short prologue (how you got there) before ДЕНЬ 1.
 - Each day = one survival problem solved with concrete actions and a real fact (water: never sea water, dew on plastic, green coconuts; fire: a water bottle as a lens; signal: SOS in stones, green leaves for white smoke, three fires in a triangle; shelter, storm → high ground) + one step of the mystery.
@@ -133,6 +135,9 @@ Check: `node $LIB/core/render/still.mjs <project> <t…> --out <project>/out/sti
 - **Flash-forward in the hook**: 3 glimpses (0.35 s each, glitch + hit) of the strongest later images during the first 8 s.
 - Punch-in zoom + shake on `@danger ≥ 70`, white flash on hard cuts, portal/iris on chapter cards.
 - Never stack two big overlays: suppress the kinetic red word while the СТОП freeze is on (a danger word right after the freeze collided with «СТОП» in island-toon), and never draw a big prop caption («ТОЛЧОК!») in a shot keyed to a red `**word**` — the kinetic word already says it.
+- **Layout of text inside inserts:** labels at y ≈ 200 (under the HUD chip), never below y ≈ 760 — the captions live at 800–900. Phone/chat inserts: `cam(960, 430, 1.45)` so the messages read; status bar and chat title on separate rows.
+- `pick()` gives the block's first shot (null) 1.4 s: if the first key word comes within 1.4 s of the block start, make that shot the null one instead of losing it. Words closer than 1.4 s to the previous cut are skipped — fold such beats into one shot (`after(at(s, 'word'))` switches a detail inside the shot: the owner appears on «пороге», the grab on «хватает»).
+- Don't open a scene with a big LCD/clock right after a chapter card — the card is still on screen; show the time as a wall clock in the set.
 - More ideas to use when the story allows: on-screen choice/poll before a twist («А ты бы открыл? ДА / НЕТ»), freeze-frame + «СТОП» + question, live countdown timer, mid-video «подпишись» pop at ~35 %, silence before a scare.
 
 ## 4. Sound
@@ -158,6 +163,9 @@ Thumbnail text = **highlighted plates** (user's preferred look, `planet-toon/js/
 
 ## Lessons (keep)
 - Never ask the user to paste API keys into chat; voices come from AI Studio by hand.
+- AI Studio sometimes reads a passage twice inside one part (freezer-toon part2b: the «Пальцы» chapter twice, +35 s). Symptom: a long gap between two blocks in `voice/align-report.txt`. Fix: copy that WAV alone into a temp project as part1.wav, run `align.py <tmp> --speed 1 --max-pause 0`, find the repeated words' times in `<tmp>/voice/asr.json`, keep the complete take with `ffmpeg -ss/-to`, re-run align + cues.
+- Dialogue names must be ONE word (`Олег:`, `Витёк:`); «Захар Ильич: «Карманы»» is not a dialogue line and gets voiced as narration — write `Хозяин: «…»` or put the name in the narration.
+- Every project needs a `.gitignore` (voice/*.wav, out/, *.wav, *.mp4) — `init_project.sh` writes it now; without it a commit swept ~300 MB of mix/music/render segments into git.
 - If AI Studio won't voice a part (freezer-toon part 2, 339 words): split it into two pieces of ≤ 200 words named `part2.wav` + `part2b.wav` (align.py takes all part*.wav in natural order, nothing else changes) and soften lines that read like a farewell note («если не доживёшь до утра, пусть знают…» → «Это улика. Утром её прочтут»).
 - Phones refused full-range yuvj420p and > 10 Mbit files → always `encode.sh`.
 - Without ASR, pause-based alignment drifts on long takes (`align_pauses.py` is only a fallback).
