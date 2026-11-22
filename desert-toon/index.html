@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"><title>video</title>
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{position:absolute;left:0;top:0;display:block;image-rendering:pixelated}</style>
+</head><body><canvas id="stage" width="1920" height="1080"></canvas><canvas id="ov" width="1920" height="1080"></canvas>
+<script type="module">
+import { createOverlay } from './overlay/overlay.js';
+const cues = await (await fetch('./cues.json')).json();
+const thumb = new URLSearchParams(location.search).get('thumb');   // ?thumb=A|B|C → YouTube thumbnail (js/thumb.js, same drawing as frame 0)
+const film = await import(thumb ? './js/thumb.js' : './js/film.js');
+const st = await film.init(document.getElementById('stage'), cues, thumb);
+const ov = thumb ? { draw() {} } : await createOverlay(document.getElementById('ov'), cues, { theme: cues.theme, base: './overlay/' });
+window.DUR = cues.total; window.EV = st.EV || [];
+window.render = t => { st.draw(t); ov.draw(t); };
+window.READY = true;
+</script></body></html>

@@ -90,7 +90,7 @@ Write `<project>/script.md` (template: `sh $SK/init_project.sh <project> <style>
 | `@toast Сохранено` | small notification, top centre |
 | `… @слово` at the end of any of these | fire on that spoken word instead of the block start |
 
-Then `$PY $SK/script2parts.py <project>` → `lines.json`, `voice/parts.json`, **`voice/AI-STUDIO.md`** (style prompt + parts of ≤ 380 words). Send the user that file: settings «Generate speech → Single-speaker, Algenib», one style for all parts, download WAV as `part1.wav…`.
+Then `$PY $SK/script2parts.py <project>` → `lines.json`, `voice/parts.json`, **`voice/AI-STUDIO.md`** (style prompt + parts of ≤ 260 words: longer parts sometimes fail in AI Studio). Send the user that file: settings «Generate speech → Single-speaker, Charon», one style for all parts, download WAV as `part1.wav…`.
 
 ## 2. Voice → timing
 Put the uploads into `<project>/voice/part1.wav…` (any names the user gives → rename by number). Then:

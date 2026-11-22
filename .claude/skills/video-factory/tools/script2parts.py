@@ -1,6 +1,6 @@
 """script.md (marked-up script) → lines.json (for captions/HUD) + voice/AI-STUDIO.md and parts.json (text to voice in AI Studio).
 
-usage: python script2parts.py <project_dir> [--max-words 380]
+usage: python script2parts.py <project_dir> [--max-words 260]
 
 Script format (see ../SKILL.md, «Разметка сценария»):
   front matter between --- lines: title, format (1920x1080 | 1080x1920), style, theme, voice, voice_style (multi-line with |)
@@ -24,7 +24,7 @@ to the voice text automatically, so what is written on screen is always what the
 Blocks are separated by blank lines."""
 import re, sys, json, os, argparse
 
-ap = argparse.ArgumentParser(); ap.add_argument('project'); ap.add_argument('--max-words', type=int, default=380); ap.add_argument('--no-auto-titles', action='store_true'); a = ap.parse_args()
+ap = argparse.ArgumentParser(); ap.add_argument('project'); ap.add_argument('--max-words', type=int, default=260); ap.add_argument('--no-auto-titles', action='store_true'); a = ap.parse_args()
 P = a.project; src = open(os.path.join(P, 'script.md'), encoding='utf-8').read()
 
 meta = {}
