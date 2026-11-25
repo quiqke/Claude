@@ -1,4 +1,4 @@
-// «Что если бы Германия выиграла войну?» — Shorts, 1080×1920, 24 fps, no voice. Style: «А что если — круглоголовые»
+// «Что если бы Германия выиграла войну?» — Shorts, 1080×1920, 24 fps, cut to the voice (voice/timing.json, word-accurate). Style: «А что если — круглоголовые»
 // (coloured stickmen with round heads, on the Sci-Fi Sitcom Toon engine), with the paper-patch move borrowed from Comic History Cartoon.
 // Map: Natural Earth 1:50m (geo.json). Territory changes are hand-cut paper patches, never borders.
 import { clamp, lerp, seg, ss, eo, ei, eio, back, hash, TAU } from '/core/lib.js';
@@ -7,7 +7,11 @@ import { puppet, scissors } from './countries.js';
 
 const canvas = document.getElementById('c'); init(canvas);
 const GEO = await (await fetch('geo.json')).json();
-const DUR = 51, q = t => Math.floor(t * 12 + 1e-6) / 12;
+const J = async u => { try { const r = await fetch(u); return r.ok ? await r.json() : null; } catch { return null; } };
+const LINES = (await J('lines.json'))?.lines || [], TIM = await J('voice/timing.json');
+// w(line, k) → start time of the k-th word (whitespace token) of line l00<line>; d is the fallback without a voice
+const w = (li, k, d) => TIM?.lines?.[`l${String(li).padStart(3, '0')}`]?.words?.[k]?.[0] ?? d;
+const VEND = TIM?.total ?? 47.7, DUR = Math.round((VEND + 1.8) * 24) / 24, q = t => Math.floor(t * 12 + 1e-6) / 12;
 // projection: equirectangular around 15°E 52°N, 40 px per degree of latitude
 const P = (lon, lat) => [(lon - 15) * 40 * .62, -(lat - 52) * 40];
 const CITY = { Берлин: [13.4, 52.5], Лондон: [-.13, 51.5], Париж: [2.35, 48.85], Москва: [37.6, 55.75], Варшава: [21, 52.2] };
@@ -17,7 +21,8 @@ const C = { sea: '#1c2a5a', seaL: '#24356e', land: '#ecdcb4', landS: '#d9c595', 
 const PATCH = {
   poland: [[14.5, 54.3], [19, 54.6], [23.8, 54], [24, 50.5], [23, 49.2], [18.8, 49.4], [14.8, 50.8]],
   france: [[-4.6, 48.5], [1.5, 50.9], [6.2, 49.4], [7.6, 47.6], [6.8, 44], [3, 43.2], [-1.5, 43.5], [-1.2, 46]],
-  lowlands: [[2.6, 51.1], [4, 51.9], [7, 53.4], [8.6, 55], [9.8, 57.5], [12.4, 55.6], [11, 54], [7, 51], [5.8, 49.5], [3, 50.5]],
+  benelux: [[2.5, 51.1], [3.4, 51.5], [4.2, 52.1], [4.7, 52.95], [5.6, 53.45], [7.1, 53.3], [7, 52.2], [6.1, 50.8], [6.3, 50.1], [5.8, 49.5], [4.8, 50], [2.9, 50.6]],
+  denmark: [[8.1, 55.5], [8.1, 57], [9.9, 57.6], [10.6, 57.7], [10.4, 56.4], [12.6, 56], [12.5, 55.3], [11.2, 54.9], [9.8, 54.8], [8.6, 54.9]],
   norway: [[5, 59], [5.5, 62.5], [10.5, 64.5], [14.8, 68.5], [17, 69], [14, 65], [12.5, 63], [11.5, 59.5], [8, 58]],
   balkans: [[13.6, 45.6], [17, 46.4], [20.5, 46.2], [23, 44.6], [22.4, 41.2], [24, 40.6], [23.6, 37.8], [21, 37], [19.3, 41.8], [15.5, 44]],
   east: [[24, 56.5], [30, 59.8], [38.5, 59], [41.5, 56], [40, 52], [36, 47.5], [30, 46], [24, 48.5], [23.5, 52]],
@@ -28,13 +33,29 @@ const PP = Object.fromEntries(Object.entries(PATCH).map(([k, v], i) => [k, ragge
 const centroid = pts => [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length];
 
 // —— the timeline ——
-const SLAP = { poland: 5.0, france: 6.6, lowlands: 8.0, norway: 9.2, balkans: 10.4, east: 25.2 };
-const T = { slam1: 12, channel: 14.4, umbrella: 16.4, throw: 16.8, bounce: 17.3, east: 21, tear: 24.6, dark: 28, us: 33.5, tag: 35.5, slam2: 38.3, peel: 41, end: 47 };
-const PEEL = { norway: 41.6, balkans: 42.4, france: 43.2, poland: 44.0, lowlands: 44.8, east: 45.5 };
-const CAPS = [[.3, 4.1, '1940. А если бы Германия победила?'], [4.6, 11.9, 'За два года — пол-Европы под одним клочком'], [14.8, 20.9, 'Британия держится за проливом'],
-  [21.5, 27.9, 'В этой версии падает Москва'], [28.4, 33.4, 'Для миллионов людей такой мир означал бы гибель'], [34, 40.9, 'Но бомба 1945 года — только у США'], [41.4, 46.9, 'Такую империю не удержать']];
-const TAGS = [[0, 14.4, '1940'], [14.4, 21, '1940'], [21, 28, '1941'], [33.5, 41, '1945'], [41, 47, 'ПОТОМ']];
-const SHOTS = [[0, 'cut'], [4.2, 'europe'], [T.slam1, 'slamDe'], [T.channel, 'channel'], [T.east, 'east'], [T.dark, 'dark'], [T.us, 'atlantic'], [T.slam2, 'slamShock'], [T.peel, 'peel'], [T.end, 'end']];
+// every beat sits on a word: a patch lands on the name of its country, the umbrella opens on «невозможна», the tag glows on «атомная»
+const L = 0.12;   // a slap lands just after the word starts
+const SLAP = { poland: w(2, 0, 4.44) + L, france: w(2, 1, 5.12) + L, benelux: w(2, 2, 6) + L, denmark: w(2, 4, 7.44) + L, norway: w(2, 5, 8) + L, balkans: w(2, 7, 9.28) + L, east: w(5, 10, 24.38) + L };
+const T = { cut: 0, europe: w(2, 0, 4.44) - .15, slam1: w(3, 0, 13.16) - .05, channel: w(4, 0, 14.54) - .1, throw: w(4, 7, 17.54) - .05, umbrella: w(4, 8, 18.06) - .25, bounce: w(4, 8, 18.06) + .1,
+  east: w(5, 0, 20.46) - .1, tear: w(5, 9, 23.94), dark: w(6, 0, 25.38) - .2, us: w(7, 0, 30.98) - .15, tag: w(7, 11, 34.98), slam2: w(7, 14, 36.3) - .05, peel: w(8, 0, 37.5) - .15, end: w(9, 0, 43.5) - .15 };
+const PEEL = { norway: w(8, 2, 38.14), balkans: w(8, 6, 39.3), france: w(8, 7, 40.1), poland: w(8, 8, 40.82), benelux: w(8, 9, 41.74) - .3, denmark: w(8, 9, 41.74) + .1, east: w(8, 10, 42.5) };
+// subtitles: the voice cut into short phrases (a sentence end, or 5 words), the word being said lit gold
+const CHUNKS = [];
+for (const l of LINES) {
+  const tm = TIM?.lines?.[l.id]; if (!tm) continue; const tok = l.spoken.split(/\s+/);
+  const emit = ids => CHUNKS.push({ words: ids.map(k => tok[k]), t: ids.map(k => tm.words[k][0]), t0: tm.words[ids[0]][0] - .06, lend: tm.t1 });
+  const real = ids => ids.filter(k => tok[k] !== '—').length;
+  const split = ids => {   // ≤ 6 words stay whole; longer: cut after the dash or comma nearest the middle, else in the middle
+    if (real(ids) <= 6) return emit(ids);
+    let best = null, mid = ids.length / 2;
+    ids.forEach((k, i) => { if (i > 0 && i < ids.length - 1 && /[—,]$/.test(tok[k]) && (best === null || Math.abs(i + 1 - mid) < Math.abs(best - mid))) best = i + 1; });
+    const c = best ?? Math.floor(mid); split(ids.slice(0, c)); split(ids.slice(c));
+  };
+  let sent = []; tok.forEach((x, k) => { sent.push(k); if (/[.?!:]$/.test(x)) { split(sent); sent = []; } }); if (sent.length) split(sent);
+}
+CHUNKS.forEach((c, i) => { const nx = CHUNKS[i + 1]; c.t1 = nx && nx.t0 - c.lend < .6 ? nx.t0 : Math.min(c.lend + .35, nx ? nx.t0 : 1e9); });
+const TAGS = [[0, T.east, '1940'], [T.east, T.dark, '1941'], [T.us, T.peel, '1945'], [T.peel, T.end, 'ПОТОМ']];
+const SHOTS = [[0, 'cut'], [T.europe, 'europe'], [T.slam1, 'slamDe'], [T.channel, 'channel'], [T.east, 'east'], [T.dark, 'dark'], [T.us, 'atlantic'], [T.slam2, 'slamShock'], [T.peel, 'peel'], [T.end, 'end']];
 const shotAt = t => { let s = SHOTS[0]; for (const x of SHOTS) if (t >= x[0]) s = x; return s; };
 
 // —— camera ——
@@ -74,7 +95,7 @@ function blurredMap(t, cx, cy, z, dark = 0) {
   g.fillStyle = `rgba(20,10,30,${.22 + dark})`; g.fillRect(0, 0, W, H);
 }
 const DE = (t, o = {}) => ({ side: 'de', x: -40, y: 60, s: .5, face: 1, t: q(t), mood: 'smug', look: [.4, 0], ...o });
-const allPatches = (t) => { for (const k of ['poland', 'france', 'lowlands', 'norway', 'balkans']) patch(k, t, { tSlap: SLAP[k], tPeel: PEEL[k] }); if (t >= T.east) patch('east', t, { tSlap: SLAP.east, tPeel: PEEL.east }); };
+const allPatches = (t) => { for (const k of ['poland', 'france', 'benelux', 'denmark', 'norway', 'balkans']) patch(k, t, { tSlap: SLAP[k], tPeel: PEEL[k] }); if (t >= T.east) patch('east', t, { tSlap: SLAP.east, tPeel: PEEL.east }); };
 
 const SH = {
   cut(t) {     // scissors already cutting a dotted line round Europe before anyone appears
@@ -85,9 +106,9 @@ const SH = {
     scissors(p[0], p[1], Math.atan2(n[1] - p[1], n[0] - p[0]), .5 + .5 * Math.sin(q(t) * 22));
   },
   europe(t) {  // the grey paper spreads: one patch per slap
-    cam(60, 90, .86, shakeAt(t), t); drawMap(t); allPatches(t);
+    cam(60, 90, lerp(.86, .94, eio(seg(t, SLAP.balkans, T.slam1))), shakeAt(t), t); drawMap(t); allPatches(t);
     const next = Object.values(SLAP).find(s => t < s + .25 && t > s - .6) ?? null, swing = next ? Math.sin(Math.PI * seg(t, next - .5, next + .2)) : 0;
-    puppet(DE(t, { mood: swing > .3 ? 'smug' : 'deadpan', armR: { h: [80 + 60 * swing, -40 - 160 * swing], bend: 20 }, legL: [0, -40 * swing], legR: [0, -40 * swing] }));
+    puppet(DE(t, { mood: swing > .3 || t > SLAP.balkans + .3 ? 'smug' : 'deadpan', armR: { h: [80 + 60 * swing, -40 - 160 * swing], bend: 20 }, legL: [0, -40 * swing], legR: [0, -40 * swing] }));
   },
   slamDe(t) {  // face slam: smug, the map blurred behind
     blurredMap(t, 60, 60, .9); cam(540, 1100, 1); const p = back(seg(t, T.slam1, T.slam1 + .2), 1.6);
@@ -149,16 +170,20 @@ function tag(t) { const tg = TAGS.find(x => t >= x[0] && t < x[1]); if (!tg) ret
   reset(); push(); translate(150, 220); rotate(-.06); scale(p); shape(rr(-110, -48, 220, 96, 10), { fill: '#e3a43a', lw: 7 }); text(tg[2], 0, 4, { font: '400 52px "Russo One"', fill: INK }); pop(); }
 let TXT = [];
 function caption(t) {
-  const c = CAPS.find(x => t >= x[0] && t < x[1]); if (!c) return;
-  const a = ss(seg(t, c[0], c[0] + .2)) * (1 - ss(seg(t, c[1] - .2, c[1])));
-  g.setTransform(1, 0, 0, 1, 0, 0); g.font = '900 50px Nunito';
-  const words = c[2].split(' '), lines = [];
-  if (g.measureText(c[2]).width <= 900) lines.push(c[2]);
-  else { let best = 1e9, k0 = 1; for (let k = 1; k < words.length; k++) { const m = Math.max(g.measureText(words.slice(0, k).join(' ')).width, g.measureText(words.slice(k).join(' ')).width); if (m < best) { best = m; k0 = k; } } lines.push(words.slice(0, k0).join(' '), words.slice(k0).join(' ')); }
-  const y0 = 1500 - (lines.length - 1) * 64, w = Math.max(...lines.map(l => g.measureText(l).width));
-  g.globalAlpha = a; g.fillStyle = 'rgba(15,10,20,.74)'; g.beginPath(); g.roundRect(540 - w / 2 - 30, y0 - 48, w + 60, lines.length * 64 + 32, 18); g.fill();
-  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; lines.forEach((l, i) => g.fillText(l, 540, y0 + i * 64)); g.globalAlpha = 1;
-  lines.forEach((l, i) => { const lw = g.measureText(l).width; TXT.push({ id: c[2] + i, text: l, x0: 540 - lw / 2, y0: y0 + i * 64 - 30, x1: 540 + lw / 2, y1: y0 + i * 64 + 30 }); });
+  const c = CHUNKS.find(x => t >= x.t0 && t < x.t1); if (!c) return;
+  const a = ss(seg(t, c.t0, c.t0 + .08)) * (1 - ss(seg(t, c.t1 - .08, c.t1)));
+  g.setTransform(1, 0, 0, 1, 0, 0); g.font = '900 58px Nunito'; const sp = g.measureText(' ').width, ww = c.words.map(x => g.measureText(x).width);
+  const width = (i0, i1) => ww.slice(i0, i1).reduce((p, x) => p + x, 0) + sp * Math.max(0, i1 - i0 - 1);
+  let rows = [[0, ww.length]];
+  if (width(0, ww.length) > 900) { let best = 1e9; for (let k = 1; k < ww.length; k++) { const m = Math.max(width(0, k), width(k, ww.length)); if (m < best && c.words[k] !== '—') { best = m; rows = [[0, k], [k, ww.length]]; } } }
+  const y0 = 1480 - (rows.length - 1) * 72, wmax = Math.max(...rows.map(r => width(...r))), pop = back(seg(t, c.t0, c.t0 + .16), 2.2);
+  g.globalAlpha = a; g.save(); g.translate(540, y0 + (rows.length - 1) * 36); g.scale(.92 + .08 * pop, .92 + .08 * pop); g.translate(-540, -(y0 + (rows.length - 1) * 36));
+  g.fillStyle = 'rgba(15,10,20,.76)'; g.beginPath(); g.roundRect(540 - wmax / 2 - 34, y0 - 52, wmax + 68, rows.length * 72 + 32, 20); g.fill();
+  g.textAlign = 'left'; g.textBaseline = 'middle';
+  rows.forEach(([i0, i1], r) => { let x = 540 - width(i0, i1) / 2; for (let i = i0; i < i1; i++) {
+    const on = t >= c.t[i] && (i + 1 >= c.t.length || t < c.t[i + 1]) && c.words[i] !== '—';
+    g.fillStyle = on ? '#f2c66a' : '#ffffff'; g.fillText(c.words[i], x, y0 + r * 72); x += ww[i] + sp; } });
+  g.restore(); g.globalAlpha = 1;
 }
 function render(t) {
   TXT = []; frame(t); screenRect('#000');
@@ -166,6 +191,6 @@ function render(t) {
   tag(t); caption(t); reset();
 }
 window.DUR = DUR; window.render = render; window.TEXTS = t => { render(t); return TXT; };
-window.EV = [...Object.entries(SLAP).map(([k, v]) => ({ t: v, type: 'slap', k })), ...Object.entries(PEEL).map(([k, v]) => ({ t: v, type: 'peel', k })), ...Object.entries(T).map(([k, v]) => ({ t: v, type: k }))];
+window.EV = [{ t: 0, type: 'voice' }, ...Object.entries(SLAP).map(([k, v]) => ({ t: v, type: 'slap', k })), ...Object.entries(PEEL).map(([k, v]) => ({ t: v, type: 'peel', k })), ...Object.entries(T).map(([k, v]) => ({ t: v, type: k }))];
 for (const f of ['900 50px Nunito', '400 92px "Russo One"']) await document.fonts.load(f, 'АБВабв0123456789.,?!—ABCabc'); await document.fonts.ready;
 render(+(new URLSearchParams(location.search).get('t') || 0)); window.READY = true;

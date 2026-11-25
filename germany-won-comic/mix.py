@@ -1,4 +1,4 @@
-# Score and foley for «Что если бы Германия выиграла войну?» — all synthesized (numpy), seeded, 48 kHz stereo, no voice.
+# Score and foley for «Что если бы Германия выиграла войну?» — all synthesized (numpy), seeded, 48 kHz stereo, with the voice on top (voice/narration.wav), the bed ducked under it.
 # Each side has its own instrument family: Germany — tuba oom-pah; Britain — a bagpipe-like drone; USSR — a bayan (reed
 # accordion); USA — banjo and a horn call. Paper foley: snips, slaps, a rip, peels. The dark panel (28–33.5 s) is only low
 # strings and slow timpani — no comic sounds there.  usage: python mix.py [out.wav]   reads events.json, writes out/mix.wav
@@ -9,7 +9,7 @@ OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'out', 'mix.wav')
 EVJ = json.load(open(os.path.join(HERE, 'events.json')))
 SR = 48000; DUR = float(EVJ['dur']); N = int(SR * DUR)
 B = {e['type']: e['t'] for e in EVJ['ev'] if 'k' not in e}
-SLAPS = [e['t'] for e in EVJ['ev'] if e['type'] == 'slap' and 'k' in e]; PEELS = [e['t'] for e in EVJ['ev'] if e['type'] == 'peel' and 'k' in e]
+SLAPS = [e['t'] for e in EVJ['ev'] if e['type'] == 'slap' and e.get('k') not in (None, 'east')]; SLAP_EAST = next(e['t'] for e in EVJ['ev'] if e.get('k') == 'east'); PEELS = [e['t'] for e in EVJ['ev'] if e['type'] == 'peel' and 'k' in e]
 L = np.zeros(N); R = np.zeros(N)
 rng = np.random.default_rng(7)
 def lp(x, f, o=2): b, a = butter(o, min(f / (SR / 2), .99)); return lfilter(b, a, x)
@@ -76,14 +76,14 @@ def fall_whistle(d=.8): t = tt(d); f = 1500 * np.exp(-t * 1.6) + 300; return np.
 # ======== the score ========
 TDE = 0.5                                    # Germany: oom-pah at 120 bpm, D minor
 # 0–4: scissors and a light tuba walk
-for k in range(14): put(snip(), .25 + k * .2856, .55, -.2 + .03 * k)
-for k, m in enumerate([38, 45, 38, 45, 41, 45, 38, 33]): put(tuba(m, .4), .2 + k * TDE, .5)
+for k in range(int((B['europe'] - .4) / .2856)): put(snip(), .25 + k * .2856, .55, -.2 + .03 * k)
+for k, m in enumerate([38, 45, 38, 45, 41, 45, 38, 33]): put(tuba(m, .4), .2 + k * TDE, .5) if .2 + k * TDE < B['europe'] - .2 else None
 # 4–12: the march: oom on the beat, pah on the off-beat; xylophone hops before each slap; a slap per patch
 prog = [(38, [62, 65, 69]), (45, [61, 64, 69]), (38, [62, 65, 69]), (43, [62, 67, 70])]
-for k in range(16):
-    t0 = 4.2 + k * TDE; bass, ch = prog[(k // 2) % 4]
+for k in range(int((B['slam1'] - B['europe']) / TDE)):
+    t0 = B['europe'] + .1 + k * TDE; bass, ch = prog[(k // 2) % 4]
     put(tuba(bass if k % 2 == 0 else bass + 7, .4), t0, .55); put(brass(ch, .16), t0 + TDE / 2, .22, .2)
-for s in SLAPS[:5]:
+for s in SLAPS:
     for j, m in enumerate([74, 77, 81]): put(xylo(m), s - .42 + j * .1, .3, .3)
     put(slap(), s, .9, -.1); put(whoosh(.3, False), s - .3, .25)
 # 12: face slam — a hit and a smug tuba sting
@@ -102,8 +102,8 @@ for k, ch in enumerate([[50, 53, 57], [50, 53, 57], [48, 52, 55], [45, 49, 52], 
     put(bayan(ch, .8), B['east'] + .1 + k * .45, .3, .35)
 for k in range(7): put(tuba(38 if k % 2 == 0 else 45, .35), B['east'] + .3 + k * TDE, .35, -.3); put(creak(.45), B['east'] + .5 + k * .5, .5, (-1) ** k * .2)
 put(rip(.8), B['tear'] - .2, .9); put(hit(.5), B['tear'] + .4, .5)
-put(slap(1.2), SLAPS[5], 1.0); put(timp(38, .5), SLAPS[5], .6)
-put(bayan([45, 48, 52], 1.6), SLAPS[5] + .5, .25, .35)    # the bayan sinks
+put(slap(1.2), SLAP_EAST, 1.0); put(timp(38, .5), SLAP_EAST, .6)
+put(bayan([45, 48, 52], 1.6), SLAP_EAST + .5, .25, .35)    # the bayan sinks
 # 28–33.5: the dark panel — low strings and slow timpani only
 put(strings([38, 41, 45, 50], B['us'] - B['dark'] + .6, 700), B['dark'], .55)
 put(strings([26, 33], B['us'] - B['dark'] + .6, 400), B['dark'], .5)
@@ -126,7 +126,17 @@ for p in PEELS: put(peel(.5), p, .7, rng.uniform(-.4, .4)); put(fall_whistle(1.0
 put(slap(1.), B['end'] + .32, .9); put(timp(38, .4), B['end'] + .32, .5)
 put(pad([50, 57, 62, 64], DUR - B['end'] - .3, 2000), B['end'] + .3, .3)
 for k, m in enumerate([74, 76, 81]): put(glock(m), B['end'] + .9 + k * .5, .16)
-# ---- master
-mix = np.stack([L, R]); fade = np.minimum(1, np.arange(N) / (SR * .02)) * np.clip((N - np.arange(N)) / (SR * .8), 0, 1)
+# ---- master: the bed sits under the voice and ducks ~7 dB while it speaks
+bed = np.stack([L, R]); bed = bed / (np.abs(bed).max() + 1e-9) * .42
+vp = os.path.join(HERE, 'voice', 'narration.wav')
+if os.path.exists(vp):
+    v, vsr = sf.read(vp); v = v.mean(1) if v.ndim > 1 else v
+    if vsr != SR: from scipy.signal import resample_poly; v = resample_poly(v, SR, vsr)
+    v = np.pad(v, (0, max(0, N - len(v))))[:N]; v = hp(v, 70) / (np.abs(v).max() + 1e-9) * .9
+    e = lp(np.abs(v), 6); e = np.minimum(1, e / (np.percentile(e[e > 1e-4], 50) + 1e-9))
+    w = int(SR * .25); e = np.convolve(e, np.ones(w) / w, 'same')   # smooth: rise and fall over ~¼ s
+    bed = bed * (1 - .55 * np.clip(e, 0, 1)); mix = bed + np.stack([v, v])
+else: mix = bed
+fade = np.minimum(1, np.arange(N) / (SR * .02)) * np.clip((N - np.arange(N)) / (SR * .8), 0, 1)
 mix = mix * fade; mix = mix / (np.abs(mix).max() + 1e-9) * .89
 os.makedirs(os.path.dirname(OUT), exist_ok=True); sf.write(OUT, mix.T, SR, subtype='PCM_24'); print('wrote', OUT, f'{DUR:.1f}s')
