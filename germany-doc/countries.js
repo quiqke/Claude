@@ -9,12 +9,21 @@ export const SIDES = {
   gb: { coat: '#b8323a', coatS: '#8e2229', legs: '#2c2f3a', shoe: '#1f1f1f', hat: 'bowler', hatC: '#2a2a30', prop: 'umbrella' },
   su: { coat: '#5b6a52', coatS: '#46533f', legs: '#4a4a4a', shoe: '#cfc7b2', hat: 'ushanka', hatC: '#6b4a32', prop: null },
   us: { coat: '#2f4b8a', coatS: '#223868', legs: '#e9e4da', shoe: '#1f1f1f', hat: 'tophat', hatC: '#2f4b8a', prop: 'tag' },
+  it: { coat: '#4f6b55', coatS: '#3d5442', legs: '#2c2f3a', shoe: '#1f1f1f', hat: 'feather', hatC: '#2a2a30', prop: null },
+  vi: { coat: '#3b5a8a', coatS: '#2c4468', legs: '#9a3030', shoe: '#1f1f1f', hat: 'kepi', hatC: '#3b5a8a', prop: null },
+  sk: { coat: '#6f7598', coatS: '#585d7c', legs: '#3a3d50', shoe: '#1f1f1f', hat: 'none', hatC: '#000', prop: null },
+  hr: { coat: '#8a4f4f', coatS: '#6e3d3d', legs: '#3a3030', shoe: '#1f1f1f', hat: 'none', hatC: '#000', prop: null },
+  gr: { coat: '#7c7a74', coatS: '#64625d', legs: '#4a4844', shoe: '#1f1f1f', hat: 'none', hatC: '#000', prop: null },
+  sab: { coat: '#2f3530', coatS: '#222622', legs: '#2a2c26', shoe: '#1f1f1f', hat: 'beanie', hatC: '#3e4238', prop: null },
 };
 function limb(a, b, bend = 0, w = 12) { const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1; stroke(quad(a, [(a[0] + b[0]) / 2 - dy / L * bend, (a[1] + b[1]) / 2 + dx / L * bend], b, 14), w); }
 function hat(kind, c) {
   if (kind === 'cap') { shape(spline([[-96, -70], [-90, -130], [0, -150], [92, -130], [100, -74]]), { fill: c, lw: 7 }); shape(rr(-110, -82, 220, 26, 10), { fill: '#3e4238', lw: 6 }); shape(spline([[20, -58], [130, -50], [120, -34], [10, -40]]), { fill: '#2a2c26', lw: 6 }); }
   if (kind === 'bowler') { shape(arc(0, -70, 82, 78, Math.PI, TAU, 26).concat([[82, -70], [-82, -70]]), { fill: c, lw: 7 }); shape(ell(0, -70, 116, 18, 30), { fill: c, lw: 7 }); }
   if (kind === 'ushanka') { shape(rr(-100, -150, 200, 96, 30), { fill: c, lw: 7, shade: () => fillOnly(rect(-110, -110, 230, 20), '#5a3d28', { boil: .3 }) }); for (const sx of [-1, 1]) shape(rr(sx * 96 - 26, -80, 52, 96, 20), { fill: c, lw: 6 }); }
+  if (kind === 'feather') { shape(arc(0, -70, 90, 50, Math.PI, TAU, 24).concat([[90, -70], [-90, -70]]), { fill: c, lw: 7 }); shape(ell(0, -70, 120, 16, 30), { fill: c, lw: 6 }); shape(spline([[40, -100], [120, -150], [190, -120], [130, -110]]), { fill: '#2f4a33', lw: 5 }); }
+  if (kind === 'kepi') { shape(rr(-80, -150, 160, 86, 12), { fill: c, lw: 7, shade: () => fillOnly(rect(-90, -90, 180, 16), '#9a3030', { boil: .3 }) }); shape(spline([[-70, -66], [90, -70], [130, -52], [-60, -56]]), { fill: '#2a2a30', lw: 6 }); }
+  if (kind === 'beanie') { shape(arc(0, -60, 100, 90, Math.PI, TAU, 26).concat([[100, -60], [-100, -60]]), { fill: c, lw: 7 }); shape(rr(-104, -76, 208, 26, 10), { fill: c, lw: 6 }); }
   if (kind === 'tophat') { shape(rr(-64, -250, 128, 190, 10), { fill: c, lw: 7, shade: () => fillOnly(rect(-70, -110, 140, 30), '#f1ece2', { boil: .3 }) }); shape(ell(0, -62, 112, 18, 30), { fill: c, lw: 7 }); }
 }
 // P: {x,y,s,face,side,mood,look,o,lean,armL,armR:{h,bend},legL,legR,hold:'umbrella-open'|..., t, nerv, sq}

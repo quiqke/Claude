@@ -1,10 +1,10 @@
 """Builds geo.json for the film: Natural Earth 1:50m admin-0 (public domain) from world-atlas 2.0.2 (ISC) on the npm CDN,
-decoded from TopoJSON into simple lon/lat rings per country, clipped to 50°W–70°E, 12°N–84°N, lightly simplified.
+decoded from TopoJSON into simple lon/lat rings per country, clipped to 125°W–70°E, 12°N–84°N, lightly simplified.
 No part of China is in this box. usage: python3 tools/map.py"""
 import json, urllib.request, pathlib
 SRC = "https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json"
 OUT = pathlib.Path(__file__).resolve().parent.parent / "geo.json"
-BOX = (-50.0, 12.0, 70.0, 84.0)
+BOX = (-125.0, 12.0, 70.0, 84.0)
 topo = json.load(urllib.request.urlopen(SRC))
 sx, sy = topo['transform']['scale']; tx, ty = topo['transform']['translate']
 arcs = []
